@@ -1,0 +1,65 @@
+# ---------------------------------------------------------------------------
+# .NET / WinUI build artifacts
+# ---------------------------------------------------------------------------
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+out/
+
+# MSIX packaging
+AppPackages/
+BundleArtifacts/
+*.appx
+*.appxbundle
+*.msix
+*.msixbundle
+*.msixupload
+GeneratedAppxManifest.xml
+
+# Build outputs / XAML artifacts
+*.pdb
+*.deps.json
+*.runtimeconfig.json
+*.appxrecipe
+*.xbf
+*.pri
+
+# IDE / Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.vsidx
+.idea/
+*.swp
+
+# Rider
+.idea/
+
+# ---------------------------------------------------------------------------
+# Models
+# ---------------------------------------------------------------------------
+# The ONNX weights are NOT redistributed in this repo:
+#  - yolov4.onnx is too large for GitHub (>100 MB hard limit on a single file).
+#  - YOLO26 weights are AGPL-3.0 (Ultralytics). Users fetch them via
+#    scripts\download-models.ps1 (HF mirror) or export from .pt themselves.
+Models/*.onnx
+Models/*.CPU.onnx
+Models/*.NPU.onnx
+Models/*.GPU.onnx
+
+# ---------------------------------------------------------------------------
+# Per-script venv / temp artifacts
+# ---------------------------------------------------------------------------
+# (download-models.ps1 creates its venv at %LOCALAPPDATA% so it's already outside the repo)
+*.log
+*.tmp
+
+# ---------------------------------------------------------------------------
+# OS clutter
+# ---------------------------------------------------------------------------
+Thumbs.db
+Desktop.ini
+.DS_Store

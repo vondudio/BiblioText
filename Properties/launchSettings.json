@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "YOLO Object DetectionSample (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "YOLO Object DetectionSample (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

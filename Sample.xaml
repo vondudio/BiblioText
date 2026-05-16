@@ -1,0 +1,301 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="AIDevGallery.Sample.Sample"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:models="using:AIDevGallery.Sample.Models"
+    mc:Ignorable="d">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Main viewer (row 0) -->
+        <Grid
+            x:Name="ViewerRoot"
+            Grid.Row="0"
+            MinWidth="240"
+            AllowDrop="True"
+            DragOver="ViewerRoot_DragOver"
+            Drop="ViewerRoot_Drop"
+            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+            BorderBrush="{ThemeResource SurfaceStrokeColorDefaultBrush}"
+            BorderThickness="2"
+            CornerRadius="{StaticResource OverlayCornerRadius}">
+            <ScrollViewer
+                x:Name="ImageScroller"
+                ZoomMode="Enabled"
+                MinZoomFactor="1.0"
+                MaxZoomFactor="3.0"
+                HorizontalScrollBarVisibility="Auto"
+                VerticalScrollBarVisibility="Auto"
+                HorizontalScrollMode="Auto"
+                VerticalScrollMode="Auto"
+                Background="Transparent">
+                <Viewbox
+                    x:Name="ImageViewbox"
+                    Margin="-1"
+                    Stretch="Uniform"
+                    Width="{Binding ViewportWidth, ElementName=ImageScroller}"
+                    Height="{Binding ViewportHeight, ElementName=ImageScroller}">
+                    <Image x:Name="DefaultImage" />
+                </Viewbox>
+            </ScrollViewer>
+            <ProgressRing
+                x:Name="Loader"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                IsActive="false"
+                Visibility="Collapsed" />
+            <Grid
+                Margin="8"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Top"
+                Background="{ThemeResource AcrylicBackgroundFillColorDefaultBrush}"
+                CornerRadius="{StaticResource ControlCornerRadius}">
+                <StackPanel Orientation="Horizontal" Spacing="4" Margin="4">
+                    <ComboBox
+                        x:Name="ModelPicker"
+                        MinWidth="180"
+                        DisplayMemberPath="DisplayName"
+                        SelectionChanged="ModelPicker_SelectionChanged"
+                        ToolTipService.ToolTip="Select model" />
+                    <StackPanel
+                        x:Name="ConfidencePanel"
+                        Orientation="Horizontal"
+                        Spacing="4"
+                        VerticalAlignment="Center"
+                        ToolTipService.ToolTip="Confidence threshold">
+                        <TextBlock
+                            Text="Conf"
+                            VerticalAlignment="Center"
+                            Margin="4,0,0,0" />
+                        <Slider
+                            x:Name="ConfidenceSlider"
+                            Minimum="0.05"
+                            Maximum="0.95"
+                            StepFrequency="0.05"
+                            TickFrequency="0.1"
+                            Width="240"
+                            Value="0.25"
+                            ValueChanged="ConfidenceSlider_ValueChanged" />
+                        <TextBox
+                            x:Name="ConfidenceText"
+                            Width="60"
+                            Text="0.25"
+                            InputScope="Number"
+                            TextAlignment="Right"
+                            VerticalAlignment="Center"
+                            LostFocus="ConfidenceText_LostFocus"
+                            KeyDown="ConfidenceText_KeyDown"
+                            ToolTipService.ToolTip="Type a value (0.05 - 0.95) and press Enter" />
+                        <StackPanel
+                            Orientation="Vertical"
+                            VerticalAlignment="Center"
+                            Spacing="0">
+                            <RepeatButton
+                                x:Name="ConfidenceUp"
+                                Width="22"
+                                Height="14"
+                                Padding="0"
+                                MinHeight="0"
+                                Click="ConfidenceUp_Click"
+                                ToolTipService.ToolTip="Increase 0.05">
+                                <FontIcon FontFamily="Segoe MDL2 Assets" FontSize="8" Glyph="&#xE70E;" />
+                            </RepeatButton>
+                            <RepeatButton
+                                x:Name="ConfidenceDown"
+                                Width="22"
+                                Height="14"
+                                Padding="0"
+                                MinHeight="0"
+                                Click="ConfidenceDown_Click"
+                                ToolTipService.ToolTip="Decrease 0.05">
+                                <FontIcon FontFamily="Segoe MDL2 Assets" FontSize="8" Glyph="&#xE70D;" />
+                            </RepeatButton>
+                        </StackPanel>
+                    </StackPanel>
+                </StackPanel>
+            </Grid>
+            <Border
+                x:Name="StatusBar"
+                Margin="8"
+                Padding="8,4"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Bottom"
+                Background="{ThemeResource AcrylicBackgroundFillColorDefaultBrush}"
+                CornerRadius="{StaticResource ControlCornerRadius}"
+                Visibility="Collapsed">
+                <TextBlock x:Name="StatusText" />
+            </Border>
+        </Grid>
+
+        <!-- Bottom thumbnail strip (row 1) -->
+        <Border
+            x:Name="StripPanel"
+            Grid.Row="1"
+            Margin="0,8,0,0"
+            Padding="12,8"
+            AllowDrop="True"
+            DragOver="ViewerRoot_DragOver"
+            Drop="ViewerRoot_Drop"
+            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+            BorderBrush="{ThemeResource SurfaceStrokeColorDefaultBrush}"
+            BorderThickness="2"
+            CornerRadius="{StaticResource OverlayCornerRadius}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid Grid.Row="0" Margin="4,0,4,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock
+                        Grid.Column="0"
+                        Text="QUEUE / PENDING"
+                        FontWeight="SemiBold"
+                        Opacity="0.85" />
+                    <TextBlock
+                        x:Name="ItemsCountLabel"
+                        Grid.Column="1"
+                        Text="0 ITEMS"
+                        FontWeight="SemiBold"
+                        Opacity="0.6" />
+                </Grid>
+                <ScrollViewer
+                    Grid.Row="1"
+                    HorizontalScrollBarVisibility="Auto"
+                    VerticalScrollBarVisibility="Disabled"
+                    HorizontalScrollMode="Auto"
+                    VerticalScrollMode="Disabled">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ItemsRepeater x:Name="ThumbnailRepeater">
+                            <ItemsRepeater.Layout>
+                                <StackLayout Orientation="Horizontal" Spacing="8" />
+                            </ItemsRepeater.Layout>
+                            <ItemsRepeater.ItemTemplate>
+                                <DataTemplate x:DataType="models:ImageItem">
+                                    <Button
+                                        Click="Thumbnail_Click"
+                                        Tag="{x:Bind}"
+                                        Padding="0"
+                                        Margin="0"
+                                        Background="Transparent"
+                                        BorderThickness="0"
+                                        AutomationProperties.Name="{x:Bind DisplayName}"
+                                        ToolTipService.ToolTip="{x:Bind FilePath}">
+                                        <Grid Width="120">
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="120" />
+                                                <RowDefinition Height="Auto" />
+                                            </Grid.RowDefinitions>
+                                            <Border
+                                                Grid.Row="0"
+                                                Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                                BorderBrush="{ThemeResource AccentFillColorDefaultBrush}"
+                                                BorderThickness="{x:Bind IsSelected, Mode=OneWay, Converter={StaticResource SelectedBorderThicknessConverter}}"
+                                                CornerRadius="4">
+                                                <Image
+                                                    Source="{x:Bind Thumbnail}"
+                                                    Stretch="UniformToFill"
+                                                    HorizontalAlignment="Stretch"
+                                                    VerticalAlignment="Stretch" />
+                                            </Border>
+                                            <TextBlock
+                                                Grid.Row="1"
+                                                Text="{x:Bind DisplayName}"
+                                                Margin="0,4,0,0"
+                                                MaxLines="1"
+                                                TextTrimming="CharacterEllipsis"
+                                                HorizontalAlignment="Center"
+                                                FontSize="12"
+                                                Opacity="0.85" />
+                                        </Grid>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsRepeater.ItemTemplate>
+                        </ItemsRepeater>
+                        <!-- Import New Scan tile -->
+                        <Button
+                            x:Name="ImportTile"
+                            Click="ImportTile_Click"
+                            Padding="0"
+                            Margin="0"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            ToolTipService.ToolTip="Import one or more images">
+                            <Grid Width="120">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="120" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <Border
+                                    Grid.Row="0"
+                                    Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                    BorderBrush="{ThemeResource AccentFillColorDefaultBrush}"
+                                    BorderThickness="2"
+                                    CornerRadius="4"
+                                    Opacity="0.7">
+                                    <StackPanel
+                                        VerticalAlignment="Center"
+                                        HorizontalAlignment="Center"
+                                        Spacing="4">
+                                        <FontIcon
+                                            FontFamily="Segoe MDL2 Assets"
+                                            Glyph="&#xE898;"
+                                            FontSize="28" />
+                                        <TextBlock
+                                            Text="IMPORT"
+                                            HorizontalAlignment="Center"
+                                            FontSize="12"
+                                            FontWeight="SemiBold" />
+                                    </StackPanel>
+                                </Border>
+                                <TextBlock
+                                    Grid.Row="1"
+                                    Text="Import New Scan"
+                                    Margin="0,4,0,0"
+                                    MaxLines="1"
+                                    TextTrimming="CharacterEllipsis"
+                                    HorizontalAlignment="Center"
+                                    FontSize="12"
+                                    Opacity="0.85" />
+                            </Grid>
+                        </Button>
+                    </StackPanel>
+                </ScrollViewer>
+                <Grid Grid.Row="2" Margin="4,12,4,0">
+                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Left">
+                        <Button
+                            x:Name="RemoveButton"
+                            Click="RemoveButton_Click"
+                            IsEnabled="False"
+                            ToolTipService.ToolTip="Remove selected image">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon FontFamily="Segoe MDL2 Assets" FontSize="14" Glyph="&#xE74D;" />
+                                <TextBlock Text="REMOVE" FontWeight="SemiBold" />
+                            </StackPanel>
+                        </Button>
+                        <Button
+                            x:Name="ExtractButton"
+                            Click="ExtractButton_Click"
+                            IsEnabled="False"
+                            ToolTipService.ToolTip="Crop each detection and submit to the title-extraction stub (Azure OpenAI GPT-5.4)">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon FontFamily="Segoe MDL2 Assets" FontSize="14" Glyph="&#xE8FA;" />
+                                <TextBlock Text="EXTRACT TITLES" FontWeight="SemiBold" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Grid>
+        </Border>
+    </Grid>
+</Page>
