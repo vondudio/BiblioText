@@ -52,7 +52,7 @@ internal sealed class AzureOpenAiAnalysisClient
                     }
                 }
             },
-            max_tokens = 2048,
+            max_completion_tokens = 2048,
             temperature = 0,
             response_format = new { type = "json_object" }
         };

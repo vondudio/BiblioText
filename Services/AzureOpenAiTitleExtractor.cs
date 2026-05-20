@@ -46,7 +46,7 @@ internal sealed class AzureOpenAiTitleExtractor : IBookTitleExtractor
                     }
                 }
             },
-            max_tokens = 64,
+            max_completion_tokens = 64,
             temperature = 0
         };
 

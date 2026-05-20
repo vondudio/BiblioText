@@ -72,7 +72,7 @@ public sealed partial class SettingsPage : Page
             var url = $"{settings.AzureOpenAiEndpoint!.TrimEnd('/')}/openai/deployments/{settings.AzureOpenAiDeployment}/chat/completions?api-version={settings.ApiVersion}";
 
             var body = new StringContent(
-                """{"messages":[{"role":"user","content":"Say hello"}],"max_tokens":5}""",
+                """{"messages":[{"role":"user","content":"Say hello"}],"max_completion_tokens":5}""",
                 System.Text.Encoding.UTF8,
                 "application/json");
 
