@@ -1,7 +1,8 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using AIDevGallery.Sample.Settings;
+using System;
 using System.Net.Http;
+using AIDevGallery.Sample.Settings;
 
 namespace AIDevGallery.Sample.Pages;
 

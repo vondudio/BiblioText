@@ -7,32 +7,32 @@ namespace AIDevGallery.Sample.Models;
 public sealed partial class ReviewCandidate : ObservableObject
 {
     [ObservableProperty]
-    private int index;
+    public partial int Index { get; set; }
 
     [ObservableProperty]
-    private string detectedTitle = string.Empty;
+    public partial string DetectedTitle { get; set; } = string.Empty;
 
     [ObservableProperty]
-    private string? detectedAuthor;
+    public partial string? DetectedAuthor { get; set; }
 
     [ObservableProperty]
-    private string editedTitle = string.Empty;
+    public partial string EditedTitle { get; set; } = string.Empty;
 
     [ObservableProperty]
-    private string? editedAuthor;
+    public partial string? EditedAuthor { get; set; }
 
     [ObservableProperty]
-    private bool isAccepted = true;
+    public partial bool IsAccepted { get; set; } = true;
 
     [ObservableProperty]
-    private byte[]? cropJpeg;
+    public partial byte[]? CropJpeg { get; set; }
 
     [ObservableProperty]
-    private int pixelWidth;
+    public partial int PixelWidth { get; set; }
 
     [ObservableProperty]
-    private int pixelHeight;
+    public partial int PixelHeight { get; set; }
 
     [ObservableProperty]
-    private double confidence;
+    public partial double Confidence { get; set; }
 }
