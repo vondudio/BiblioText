@@ -1,7 +1,8 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using System.Runtime.InteropServices;
 using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using Microsoft.UI.Xaml.Media;
 using Windows.ApplicationModel.DataTransfer;
 
@@ -14,8 +15,35 @@ public sealed partial class MainWindow : Window
         this.InitializeComponent();
         this.RootFrame.Loaded += (sender, args) =>
         {
-            RootFrame.Navigate(typeof(Sample));
+            // Select the Scan tab by default
+            NavView.SelectedItem = NavView.MenuItems[0];
         };
+    }
+
+    private void NavView_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
+    {
+        if (args.IsSettingsSelected)
+        {
+            RootFrame.Navigate(typeof(Pages.SettingsPage));
+            return;
+        }
+
+        if (args.SelectedItemContainer is NavigationViewItem item)
+        {
+            var tag = item.Tag?.ToString();
+            switch (tag)
+            {
+                case "scan":
+                    RootFrame.Navigate(typeof(Sample));
+                    break;
+                case "review":
+                    RootFrame.Navigate(typeof(Pages.ReviewPage));
+                    break;
+                case "library":
+                    RootFrame.Navigate(typeof(Pages.LibraryPage));
+                    break;
+            }
+        }
     }
 
     internal void ModelLoaded()
@@ -85,5 +113,21 @@ public sealed partial class MainWindow : Window
 StackTrace: {ex.StackTrace}
 {innerExceptionData}";
         return details;
+    }
+
+    /// <summary>
+    /// Navigate to the Review page and pass in candidates from an AI analysis or crop extraction.
+    /// </summary>
+    internal void NavigateToReview(System.Collections.Generic.List<Models.ReviewCandidate> candidates)
+    {
+        // Select the Review nav item
+        NavView.SelectedItem = NavView.MenuItems[1];
+        RootFrame.Navigate(typeof(Pages.ReviewPage));
+
+        // Pass candidates to the page after navigation
+        if (RootFrame.Content is Pages.ReviewPage reviewPage)
+        {
+            reviewPage.SetCandidates(candidates);
+        }
     }
 }

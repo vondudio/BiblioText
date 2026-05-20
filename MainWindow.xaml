@@ -6,7 +6,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:local="using:AIDevGallery.Sample"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    Title="YOLO Object DetectionSample"
+    Title="BiblioText"
     mc:Ignorable="d">
 
     <Window.SystemBackdrop>
@@ -14,7 +14,31 @@
     </Window.SystemBackdrop>
 
     <Grid>
-        <Frame x:Name="RootFrame" Padding="16" />
+        <NavigationView
+            x:Name="NavView"
+            IsBackButtonVisible="Collapsed"
+            PaneDisplayMode="Left"
+            IsSettingsVisible="True"
+            SelectionChanged="NavView_SelectionChanged">
+            <NavigationView.MenuItems>
+                <NavigationViewItem Content="Scan" Tag="scan">
+                    <NavigationViewItem.Icon>
+                        <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE722;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="Review" Tag="review">
+                    <NavigationViewItem.Icon>
+                        <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE70B;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="Library" Tag="library">
+                    <NavigationViewItem.Icon>
+                        <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE736;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+            </NavigationView.MenuItems>
+            <Frame x:Name="RootFrame" Padding="16" />
+        </NavigationView>
         <Grid
             x:Name="ProgressRingGrid"
             Background="{ThemeResource SmokeFillColorDefaultBrush}"

@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Drawing;
+using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -42,7 +43,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
     private ImageItem? _activeImage;
 
     // Stub Azure OpenAI extractor; swap implementation when wiring the real API.
-    private readonly IBookTitleExtractor _titleExtractor = new StubBookTitleExtractor();
+    private IBookTitleExtractor _titleExtractor = App.TitleExtractor ?? new StubBookTitleExtractor();
 
     // Confidence slider state. We re-run inference only when the user has
     // released the slider thumb (mouse up / pointer capture lost). Keyboard
@@ -259,6 +260,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
             _activeImage = item;
             item.IsSelected = true;
             RemoveButton.IsEnabled = true;
+            AiAnalyzeButton.IsEnabled = true;
         }
 
         // Always swap to the pristine source first so any stale boxes from a previous
@@ -349,6 +351,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         doomed.Dispose();
         _activeImage = null;
         ExtractButton.IsEnabled = false;
+        AiAnalyzeButton.IsEnabled = false;
 
         if (_images.Count == 0)
         {
@@ -357,6 +360,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
             StatusBar.Visibility = Visibility.Collapsed;
             RemoveButton.IsEnabled = false;
             ExtractButton.IsEnabled = false;
+            AiAnalyzeButton.IsEnabled = false;
             return;
         }
 
@@ -429,11 +433,38 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
 
     private async Task ShowResultsDialog(ImageItem item, List<(BookCrop Crop, string Title)> results, string folder)
     {
+        // Build ReviewCandidates from the extraction results
+        var candidates = new List<Models.ReviewCandidate>();
+        for (int i = 0; i < results.Count; i++)
+        {
+            var (crop, title) = results[i];
+            string detectedTitle = title;
+            string? detectedAuthor = null;
+            if (title.Contains(',') && !title.StartsWith("("))
+            {
+                var parts = title.Split(',', 2);
+                detectedTitle = parts[0].Trim();
+                detectedAuthor = parts.Length > 1 ? parts[1].Trim() : null;
+            }
+            candidates.Add(new Models.ReviewCandidate
+            {
+                Index = i,
+                DetectedTitle = detectedTitle,
+                DetectedAuthor = detectedAuthor,
+                EditedTitle = detectedTitle,
+                EditedAuthor = detectedAuthor,
+                IsAccepted = true,
+                CropJpeg = crop.Jpeg,
+                PixelWidth = crop.PixelWidth,
+                PixelHeight = crop.PixelHeight,
+                Confidence = crop.Confidence
+            });
+        }
+        _latestReviewCandidates = candidates;
+
         var sb = new StringBuilder();
         sb.AppendLine($"Extracted {results.Count} crop{(results.Count == 1 ? string.Empty : "s")} from '{item.DisplayName}'.");
         sb.AppendLine($"JPEGs saved to: {folder}");
-        sb.AppendLine();
-        sb.AppendLine("Stub extractor responses:");
         sb.AppendLine();
         foreach (var (crop, title) in results)
         {
@@ -443,7 +474,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
 
         var dialog = new ContentDialog
         {
-            Title = "Title extraction (stub)",
+            Title = "Title Extraction",
             Content = new ScrollViewer
             {
                 Content = new TextBlock
@@ -456,13 +487,21 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
                 MaxHeight = 480,
                 MaxWidth = 720,
             },
-            PrimaryButtonText = "Open crop folder",
+            PrimaryButtonText = "Send to Review",
+            SecondaryButtonText = "Open crop folder",
             CloseButtonText = "Close",
-            DefaultButton = ContentDialogButton.Close,
+            DefaultButton = ContentDialogButton.Primary,
             XamlRoot = this.XamlRoot,
         };
         var result = await dialog.ShowAsync();
         if (result == ContentDialogResult.Primary)
+        {
+            if (App.Window is MainWindow mw)
+            {
+                mw.NavigateToReview(candidates);
+            }
+        }
+        else if (result == ContentDialogResult.Secondary)
         {
             try
             {
@@ -481,6 +520,77 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         var chars = s.Select(c => invalid.Contains(c) ? '_' : c).ToArray();
         return new string(chars);
     }
+
+    private async void AiAnalyzeButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_activeImage == null) return;
+
+        var workflow = App.WorkflowService;
+        if (workflow == null)
+        {
+            App.Window?.ShowException(null, "Workflow service not initialized.");
+            return;
+        }
+
+        AiAnalyzeButton.IsEnabled = false;
+        Loader.IsActive = true;
+        Loader.Visibility = Visibility.Visible;
+
+        try
+        {
+            // Encode the source bitmap to JPEG for the AI
+            byte[] imageJpeg;
+            using (var ms = new MemoryStream())
+            {
+                _activeImage.SourceBitmap.Save(ms, System.Drawing.Imaging.ImageFormat.Jpeg);
+                imageJpeg = ms.ToArray();
+            }
+
+            var candidates = await workflow.AnalyzeFullImageAsync(
+                imageJpeg, _activeImage.FilePath ?? _activeImage.DisplayName);
+
+            if (candidates.Count == 0)
+            {
+                App.Window?.ShowException(null, "AI analysis returned no books. Try adjusting the image or check Settings.");
+                return;
+            }
+
+            // Store candidates for the Review page to pick up
+            _latestReviewCandidates = candidates;
+
+            var dialog = new ContentDialog
+            {
+                Title = "AI Analysis Complete",
+                Content = $"Detected {candidates.Count} book(s). Navigate to the Review tab to review and save them.",
+                PrimaryButtonText = "Go to Review",
+                CloseButtonText = "Stay here",
+                XamlRoot = this.XamlRoot,
+                DefaultButton = ContentDialogButton.Primary,
+            };
+            var result = await dialog.ShowAsync();
+            if (result == ContentDialogResult.Primary)
+            {
+                // Navigate to review page
+                if (App.Window is MainWindow mw)
+                {
+                    mw.NavigateToReview(candidates);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            App.Window?.ShowException(ex, "Full-image AI analysis failed.");
+        }
+        finally
+        {
+            Loader.IsActive = false;
+            Loader.Visibility = Visibility.Collapsed;
+            AiAnalyzeButton.IsEnabled = _activeImage != null;
+        }
+    }
+
+    /// <summary>Latest review candidates from AI analysis, available for the Review page.</summary>
+    internal static List<Models.ReviewCandidate>? _latestReviewCandidates;
 
     private void ViewerRoot_DragOver(object sender, DragEventArgs e)
     {

@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="AIDevGallery.Sample.Pages.LibraryPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Grid Padding="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <TextBlock
+            Grid.Row="0"
+            Text="My Library"
+            Style="{StaticResource TitleTextBlockStyle}"
+            Margin="0,0,0,16" />
+
+        <!-- Search and filter bar -->
+        <Grid Grid.Row="1" Margin="0,0,0,12" ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="200" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <AutoSuggestBox
+                x:Name="SearchBox"
+                Grid.Column="0"
+                PlaceholderText="Search books..."
+                QueryIcon="Find"
+                TextChanged="SearchBox_TextChanged" />
+
+            <ComboBox
+                x:Name="LocationFilter"
+                Grid.Column="1"
+                PlaceholderText="All Locations"
+                SelectionChanged="LocationFilter_SelectionChanged" />
+
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
+                <Button x:Name="AddLocationBtn" Click="AddLocationBtn_Click" ToolTipService.ToolTip="Manage locations">
+                    <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE728;" FontSize="14" />
+                </Button>
+                <Button x:Name="DeleteBookBtn" Click="DeleteBookBtn_Click" ToolTipService.ToolTip="Delete selected book" IsEnabled="False">
+                    <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE74D;" FontSize="14" />
+                </Button>
+            </StackPanel>
+        </Grid>
+
+        <!-- Book list -->
+        <ListView
+            x:Name="BookList"
+            Grid.Row="2"
+            SelectionChanged="BookList_SelectionChanged"
+            SelectionMode="Single">
+            <ListView.ItemTemplate>
+                <DataTemplate>
+                    <Grid Padding="8,12" ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="200" />
+                            <ColumnDefinition Width="120" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding Author}" Opacity="0.7" FontSize="13" />
+                        </StackPanel>
+                        <TextBlock Grid.Column="1" Text="{Binding LocationName}" VerticalAlignment="Center" Opacity="0.6" />
+                        <TextBlock Grid.Column="2" Text="{Binding CreatedAtDisplay}" VerticalAlignment="Center" Opacity="0.5" FontSize="12" />
+                    </Grid>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+
+        <!-- Empty state -->
+        <StackPanel
+            x:Name="EmptyState"
+            Grid.Row="2"
+            VerticalAlignment="Center"
+            HorizontalAlignment="Center"
+            Spacing="8"
+            Visibility="Visible">
+            <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE736;" FontSize="48" Opacity="0.3" />
+            <TextBlock Text="No books in your library yet" Opacity="0.5" HorizontalAlignment="Center" />
+            <TextBlock Text="Scan a bookshelf and save detected books to get started." Opacity="0.4" FontSize="12" HorizontalAlignment="Center" />
+        </StackPanel>
+    </Grid>
+</Page>

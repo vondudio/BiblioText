@@ -293,6 +293,16 @@
                                 <TextBlock Text="EXTRACT TITLES" FontWeight="SemiBold" />
                             </StackPanel>
                         </Button>
+                        <Button
+                            x:Name="AiAnalyzeButton"
+                            Click="AiAnalyzeButton_Click"
+                            IsEnabled="False"
+                            ToolTipService.ToolTip="Send the full image to Azure OpenAI for bookshelf analysis (no YOLO needed)">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon FontFamily="Segoe MDL2 Assets" FontSize="14" Glyph="&#xE9D9;" />
+                                <TextBlock Text="AI ANALYZE" FontWeight="SemiBold" />
+                            </StackPanel>
+                        </Button>
                     </StackPanel>
                 </Grid>
             </Grid>

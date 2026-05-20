@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="AIDevGallery.Sample.Pages.ReviewPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Grid Padding="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <TextBlock
+            Grid.Row="0"
+            Text="Review Detected Books"
+            Style="{StaticResource TitleTextBlockStyle}"
+            Margin="0,0,0,8" />
+
+        <TextBlock
+            Grid.Row="1"
+            x:Name="ReviewStatus"
+            Text="No scan results to review. Run a scan first from the Scan tab."
+            Opacity="0.7"
+            Margin="0,0,0,16" />
+
+        <!-- Book list -->
+        <ListView
+            x:Name="ReviewList"
+            Grid.Row="2"
+            SelectionMode="None"
+            Visibility="Collapsed">
+            <ListView.ItemTemplate>
+                <DataTemplate>
+                    <Grid Padding="8" ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="80" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Crop thumbnail -->
+                        <Border
+                            Grid.Column="0"
+                            Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                            CornerRadius="4"
+                            Height="100">
+                            <Image x:Name="CropImage" Stretch="Uniform" />
+                        </Border>
+
+                        <!-- Editable fields -->
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="8">
+                            <TextBox
+                                Header="Title"
+                                Text="{Binding EditedTitle, Mode=TwoWay}"
+                                PlaceholderText="Book title" />
+                            <TextBox
+                                Header="Author"
+                                Text="{Binding EditedAuthor, Mode=TwoWay}"
+                                PlaceholderText="Author (optional)" />
+                            <TextBlock
+                                Text="{Binding Confidence}"
+                                Opacity="0.5"
+                                FontSize="12" />
+                        </StackPanel>
+
+                        <!-- Accept/Reject toggle -->
+                        <ToggleSwitch
+                            Grid.Column="2"
+                            VerticalAlignment="Center"
+                            IsOn="{Binding IsAccepted, Mode=TwoWay}"
+                            OnContent="Accept"
+                            OffContent="Reject" />
+                    </Grid>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+
+        <!-- Actions -->
+        <StackPanel
+            Grid.Row="3"
+            Orientation="Horizontal"
+            Spacing="12"
+            Margin="0,16,0,0"
+            HorizontalAlignment="Right">
+            <Button Content="Accept All" x:Name="AcceptAllButton" Click="AcceptAllButton_Click" />
+            <Button Content="Reject All" x:Name="RejectAllButton" Click="RejectAllButton_Click" />
+            <Button
+                Content="Save to Library"
+                x:Name="SaveButton"
+                Click="SaveButton_Click"
+                Style="{StaticResource AccentButtonStyle}" />
+        </StackPanel>
+    </Grid>
+</Page>

@@ -1,0 +1,19 @@
+#nullable enable
+
+using System;
+
+namespace AIDevGallery.Sample.Models;
+
+public sealed class Book
+{
+    public int Id { get; set; }
+    public required string Title { get; set; }
+    public string? Author { get; set; }
+    public int? ScanId { get; set; }
+    public int? LocationId { get; set; }
+    public string? SpineImagePath { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime? ModifiedAt { get; set; }
+    public bool IsDuplicate { get; set; }
+    public string? Notes { get; set; }
+}
