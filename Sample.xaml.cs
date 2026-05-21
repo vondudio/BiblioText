@@ -586,7 +586,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
                 previewSource = null;
                 previewImage.Source = null;
                 statusText.Text = $"Unable to preview {device.Name}.";
-                App.Window?.ShowException(ex, $"Failed to start preview for '{device.Name}'.");
+                Debug.WriteLine($"Camera init failed for '{device.Name}': {ex.Message}");
                 return false;
             }
             finally
@@ -663,9 +663,16 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
 
         try
         {
+            bool cameraReady = false;
             if (cameraPicker.SelectedItem is DeviceInformation initialCamera)
             {
-                await InitializeCameraAsync(initialCamera);
+                cameraReady = await InitializeCameraAsync(initialCamera);
+            }
+
+            if (!cameraReady && cameras.Count <= 1)
+            {
+                // Camera init failed and no alternatives — don't show dialog.
+                return;
             }
 
             await dialog.ShowAsync();
