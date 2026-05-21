@@ -606,7 +606,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
 
         takePhotoButton.Click += async (_, _) =>
         {
-            if (mediaCapture == null || isCapturingPhoto)
+            if (frameReader == null || isCapturingPhoto)
             {
                 return;
             }
@@ -617,32 +617,43 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
 
             try
             {
-                using var photoStream = new InMemoryRandomAccessStream();
-                await mediaCapture.CapturePhotoToStreamAsync(ImageEncodingProperties.CreateJpeg(), photoStream);
-                photoStream.Seek(0);
+                // Grab the latest frame from the reader instead of CapturePhotoToStreamAsync
+                // which is unreliable with StreamingCaptureMode.Video on ARM64.
+                using var frame = frameReader.TryAcquireLatestFrame();
+                var softwareBitmap = frame?.VideoMediaFrame?.SoftwareBitmap;
+                if (softwareBitmap == null)
+                {
+                    statusText.Text = "No frame available. Try again.";
+                    takePhotoButton.IsEnabled = true;
+                    isCapturingPhoto = false;
+                    return;
+                }
+
+                // Convert to Bgra8 for encoding
+                using var convertedBitmap = SoftwareBitmap.Convert(softwareBitmap, BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied);
 
                 string captureFolderPath = Path.Combine(Path.GetTempPath(), "YOLO_Captures");
                 Directory.CreateDirectory(captureFolderPath);
 
                 string fileName = $"capture_{DateTime.Now:yyyyMMdd_HHmmss}.jpg";
-                StorageFolder captureFolder = await StorageFolder.GetFolderFromPathAsync(captureFolderPath);
-                StorageFile captureFile = await captureFolder.CreateFileAsync(fileName, CreationCollisionOption.GenerateUniqueName);
+                string filePath = Path.Combine(captureFolderPath, fileName);
 
-                using (var fileStream = await captureFile.OpenAsync(FileAccessMode.ReadWrite))
+                using (var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write))
                 {
-                    await RandomAccessStream.CopyAsync(photoStream.GetInputStreamAt(0), fileStream.GetOutputStreamAt(0));
-                    await fileStream.FlushAsync();
+                    var encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.JpegEncoderId, fileStream.AsRandomAccessStream());
+                    encoder.SetSoftwareBitmap(convertedBitmap);
+                    await encoder.FlushAsync();
                 }
 
                 await CleanupCameraAsync();
-                await AddImageAsync(captureFile.Path, activate: true);
+                await AddImageAsync(filePath, activate: true);
                 dialog.Hide();
             }
             catch (Exception ex)
             {
                 statusText.Text = "Capture failed. Try again.";
                 App.Window?.ShowException(ex, "Failed to capture photo.");
-                takePhotoButton.IsEnabled = mediaCapture != null && isPreviewing;
+                takePhotoButton.IsEnabled = frameReader != null && isPreviewing;
             }
             finally
             {
