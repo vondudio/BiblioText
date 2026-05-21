@@ -550,7 +550,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
                 var initSettings = new MediaCaptureInitializationSettings
                 {
                     VideoDeviceId = device.Id,
-                    StreamingCaptureMode = StreamingCaptureMode.Video,
+                    PhotoCaptureSource = PhotoCaptureSource.Auto,
                     MemoryPreference = MediaCaptureMemoryPreference.Cpu,
                 };
                 if (matchingGroup != null)
@@ -629,7 +629,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
             var deferral = args.GetDeferral();
             args.Cancel = true; // prevent auto-close; we'll call dialog.Hide() on success
 
-            if (frameReader == null || isCapturingPhoto)
+            if (mediaCapture == null || isCapturingPhoto)
             {
                 deferral.Complete();
                 return;
@@ -641,18 +641,10 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
 
             try
             {
-                using var frame = frameReader.TryAcquireLatestFrame();
-                var softwareBitmap = frame?.VideoMediaFrame?.SoftwareBitmap;
-                if (softwareBitmap == null)
-                {
-                    statusText.Text = "No frame available. Try again.";
-                    dialog.IsPrimaryButtonEnabled = true;
-                    isCapturingPhoto = false;
-                    deferral.Complete();
-                    return;
-                }
-
-                using var convertedBitmap = SoftwareBitmap.Convert(softwareBitmap, BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied);
+                using var photoStream = new InMemoryRandomAccessStream();
+                await mediaCapture.CapturePhotoToStreamAsync(
+                    ImageEncodingProperties.CreateJpeg(), photoStream);
+                photoStream.Seek(0);
 
                 string captureFolderPath = Path.Combine(Path.GetTempPath(), "YOLO_Captures");
                 Directory.CreateDirectory(captureFolderPath);
@@ -662,9 +654,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
 
                 using (var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write))
                 {
-                    var encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.JpegEncoderId, fileStream.AsRandomAccessStream());
-                    encoder.SetSoftwareBitmap(convertedBitmap);
-                    await encoder.FlushAsync();
+                    await photoStream.AsStreamForRead().CopyToAsync(fileStream);
                 }
 
                 await CleanupCameraAsync();
@@ -674,8 +664,8 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
             }
             catch (Exception ex)
             {
-                statusText.Text = "Capture failed. Try again.";
-                dialog.IsPrimaryButtonEnabled = frameReader != null && isPreviewing;
+                statusText.Text = $"Capture failed: {ex.Message}";
+                dialog.IsPrimaryButtonEnabled = mediaCapture != null && isPreviewing;
                 deferral.Complete();
             }
             finally
