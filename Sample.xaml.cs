@@ -600,7 +600,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
                 nextCapture?.Dispose();
                 previewSource = null;
                 previewImage.Source = null;
-                statusText.Text = $"Unable to preview {device.Name}.";
+                statusText.Text = $"Camera failed: {ex.Message}";
                 Debug.WriteLine($"Camera init failed for '{device.Name}': {ex.Message}");
                 return false;
             }
