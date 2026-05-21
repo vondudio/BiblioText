@@ -20,6 +20,7 @@ public sealed partial class LibraryPage : Page
     public LibraryPage()
     {
         this.InitializeComponent();
+        this.NavigationCacheMode = Microsoft.UI.Xaml.Navigation.NavigationCacheMode.Required;
         BookList.ItemsSource = _books;
         LocationFilter.ItemsSource = _locations;
         this.Loaded += LibraryPage_Loaded;

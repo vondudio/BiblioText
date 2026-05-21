@@ -9,6 +9,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using AIDevGallery.Sample.Models;
+using Windows.Storage.Streams;
 
 namespace AIDevGallery.Sample.Pages;
 
@@ -21,6 +22,7 @@ public sealed partial class ReviewPage : Page
     public ReviewPage()
     {
         this.InitializeComponent();
+        this.NavigationCacheMode = Microsoft.UI.Xaml.Navigation.NavigationCacheMode.Required;
         ReviewList.ItemsSource = _candidates;
         LocationDropdown.ItemsSource = _locations;
         this.Loaded += ReviewPage_Loaded;
@@ -92,7 +94,21 @@ public sealed partial class ReviewPage : Page
         }
 
         OverlayScroller.ChangeView(0, 0, 1.0f, disableAnimation: true);
+        OverlayImage.Source = SourceThumbnail.Source;
         ImageOverlay.Visibility = Visibility.Visible;
+    }
+
+    private void CropThumbnail_PointerPressed(object sender, PointerRoutedEventArgs e)
+    {
+        if (sender is FrameworkElement fe && fe.DataContext is ReviewCandidate candidate && candidate.CropJpeg != null)
+        {
+            var bitmapImage = new BitmapImage();
+            using var stream = new MemoryStream(candidate.CropJpeg);
+            bitmapImage.SetSource(stream.AsRandomAccessStream());
+            OverlayImage.Source = bitmapImage;
+            OverlayScroller.ChangeView(0, 0, 1.0f, disableAnimation: true);
+            ImageOverlay.Visibility = Visibility.Visible;
+        }
     }
 
     private void ImageOverlay_PointerPressed(object sender, PointerRoutedEventArgs e)

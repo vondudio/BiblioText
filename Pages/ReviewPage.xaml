@@ -61,12 +61,14 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
 
-                        <!-- Crop thumbnail -->
+                        <!-- Crop thumbnail (click to view) -->
                         <Border
                             Grid.Column="0"
                             Background="{ThemeResource SubtleFillColorSecondaryBrush}"
                             CornerRadius="4"
-                            Height="100">
+                            Height="100"
+                            PointerPressed="CropThumbnail_PointerPressed"
+                            ToolTipService.ToolTip="Click to view spine crop">
                             <Image x:Name="CropImage" Stretch="Uniform" />
                         </Border>
 

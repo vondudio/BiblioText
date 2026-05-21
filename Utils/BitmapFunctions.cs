@@ -382,6 +382,19 @@ internal class BitmapFunctions
     }
 
     /// <summary>
+    /// Renders numbered bounding boxes onto a copy of the image and returns JPEG bytes.
+    /// The original image is not modified.
+    /// </summary>
+    public static byte[] RenderAnnotatedJpeg(Bitmap sourceImage, IReadOnlyList<Prediction> predictions)
+    {
+        using var copy = new Bitmap(sourceImage);
+        DrawPredictions(copy, predictions.ToList());
+        using var ms = new MemoryStream();
+        copy.Save(ms, ImageFormat.Jpeg);
+        return ms.ToArray();
+    }
+
+    /// <summary>
     /// Renders YOLO26-seg results: paints translucent class-colored masks over the
     /// pixels they cover, then draws the bounding-box rectangles + labels on top.
     /// </summary>
@@ -402,7 +415,10 @@ internal class BitmapFunctions
         float markerSize = (image.Width + image.Height) * 0.001f;
         using Pen pen = new(Color.Red, markerSize);
         using Brush brush = new SolidBrush(Color.White);
+        using Brush bgBrush = new SolidBrush(Color.FromArgb(180, 0, 0, 0));
         using Font font = new("Arial", GetAdjustedFontsize(predictions));
+        using Font idFont = new("Arial", GetAdjustedFontsize(predictions) * 1.5f, FontStyle.Bold);
+        int index = 1;
         foreach (var p in predictions)
         {
             if (p == null || p.Box == null)
@@ -414,8 +430,18 @@ internal class BitmapFunctions
             g.DrawLine(pen, p.Box.Xmax, p.Box.Ymax, p.Box.Xmin, p.Box.Ymax);
             g.DrawLine(pen, p.Box.Xmin, p.Box.Ymax, p.Box.Xmin, p.Box.Ymin);
 
+            // Draw numerical ID badge
+            string idText = index.ToString();
+            var idSize = g.MeasureString(idText, idFont);
+            float badgeX = p.Box.Xmin;
+            float badgeY = p.Box.Ymin - idSize.Height - 2;
+            if (badgeY < 0) badgeY = p.Box.Ymin + 2;
+            g.FillRectangle(bgBrush, badgeX, badgeY, idSize.Width + 4, idSize.Height);
+            g.DrawString(idText, idFont, brush, badgeX + 2, badgeY);
+
             string labelText = $"{p.Label}, {p.Confidence:0.00}";
-            g.DrawString(labelText, font, brush, new PointF(p.Box.Xmin, p.Box.Ymin));
+            g.DrawString(labelText, font, brush, new PointF(p.Box.Xmin, p.Box.Ymax + 2));
+            index++;
         }
     }
 

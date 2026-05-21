@@ -81,6 +81,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
             _images.Clear();
         };
         this.InitializeComponent();
+        this.NavigationCacheMode = Microsoft.UI.Xaml.Navigation.NavigationCacheMode.Required;
 
         ThumbnailRepeater.ItemsSource = _images;
         _images.CollectionChanged += (s, e) => UpdateItemsCountLabel();
@@ -178,13 +179,6 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         {
             App.Window?.ShowException(ex, "Failed to load model.");
             return;
-        }
-
-        // Seed the strip with the bundled default photo so it's never empty on launch.
-        string defaultPath = Path.Join(_assetsDir, "team.jpg");
-        if (File.Exists(defaultPath))
-        {
-            await AddImageAsync(defaultPath, activate: true);
         }
     }
 
@@ -891,10 +885,16 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
 
         try
         {
-            // Encode the source bitmap to JPEG for the AI
+            // If we have detection results, send the annotated image with numbered boxes
+            // so the AI can reference detections by ID.
             byte[] imageJpeg;
-            using (var ms = new MemoryStream())
+            if (_activeImage.Outputs.TryGetValue(CacheKey(), out var cached) && cached.BoxPredictions.Count > 0)
             {
+                imageJpeg = BitmapFunctions.RenderAnnotatedJpeg(_activeImage.SourceBitmap, cached.BoxPredictions);
+            }
+            else
+            {
+                using var ms = new MemoryStream();
                 _activeImage.SourceBitmap.Save(ms, System.Drawing.Imaging.ImageFormat.Jpeg);
                 imageJpeg = ms.ToArray();
             }
