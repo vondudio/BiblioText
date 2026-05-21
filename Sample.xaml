@@ -269,6 +269,52 @@
                                     Opacity="0.85" />
                             </Grid>
                         </Button>
+                        <Button
+                            x:Name="CaptureTile"
+                            Click="CaptureTile_Click"
+                            Padding="0"
+                            Margin="0"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            ToolTipService.ToolTip="Capture photo from camera">
+                            <Grid Width="120">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="120" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <Border
+                                    Grid.Row="0"
+                                    Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                    BorderBrush="{ThemeResource AccentFillColorDefaultBrush}"
+                                    BorderThickness="2"
+                                    CornerRadius="4"
+                                    Opacity="0.7">
+                                    <StackPanel
+                                        VerticalAlignment="Center"
+                                        HorizontalAlignment="Center"
+                                        Spacing="4">
+                                        <FontIcon
+                                            FontFamily="Segoe MDL2 Assets"
+                                            Glyph="&#xE8B8;"
+                                            FontSize="28" />
+                                        <TextBlock
+                                            Text="CAPTURE"
+                                            HorizontalAlignment="Center"
+                                            FontSize="12"
+                                            FontWeight="SemiBold" />
+                                    </StackPanel>
+                                </Border>
+                                <TextBlock
+                                    Grid.Row="1"
+                                    Text="Camera Photo"
+                                    Margin="0,4,0,0"
+                                    MaxLines="1"
+                                    TextTrimming="CharacterEllipsis"
+                                    HorizontalAlignment="Center"
+                                    FontSize="12"
+                                    Opacity="0.85" />
+                            </Grid>
+                        </Button>
                     </StackPanel>
                 </ScrollViewer>
                 <Grid Grid.Row="2" Margin="4,12,4,0">

@@ -60,18 +60,63 @@
             SelectionMode="Single">
             <ListView.ItemTemplate>
                 <DataTemplate>
-                    <Grid Padding="8,12" ColumnSpacing="16">
+                    <Grid Padding="8,12" ColumnSpacing="12">
                         <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="48" />
                             <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="200" />
-                            <ColumnDefinition Width="120" />
+                            <ColumnDefinition Width="160" />
+                            <ColumnDefinition Width="100" />
+                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0">
+
+                        <Border
+                            Grid.Column="0"
+                            Width="48"
+                            Height="48"
+                            CornerRadius="4"
+                            Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                            <Grid>
+                                <FontIcon
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    FontFamily="Segoe MDL2 Assets"
+                                    Glyph="&#xE736;"
+                                    FontSize="20"
+                                    Opacity="0.3" />
+                                <Image Source="{Binding SpineImagePath}" Stretch="UniformToFill" />
+                            </Grid>
+                        </Border>
+
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
                             <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
                             <TextBlock Text="{Binding Author}" Opacity="0.7" FontSize="13" />
                         </StackPanel>
-                        <TextBlock Grid.Column="1" Text="{Binding LocationName}" VerticalAlignment="Center" Opacity="0.6" />
-                        <TextBlock Grid.Column="2" Text="{Binding CreatedAtDisplay}" VerticalAlignment="Center" Opacity="0.5" FontSize="12" />
+
+                        <TextBlock Grid.Column="2" Text="{Binding LocationName}" VerticalAlignment="Center" Opacity="0.6" />
+                        <TextBlock Grid.Column="3" Text="{Binding CreatedAtDisplay}" VerticalAlignment="Center" Opacity="0.5" FontSize="12" />
+
+                        <Button
+                            Grid.Column="4"
+                            Padding="8,4"
+                            VerticalAlignment="Center"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Tag="{Binding}">
+                            <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE712;" FontSize="14" />
+                            <Button.Flyout>
+                                <MenuFlyout>
+                                    <MenuFlyoutItem Text="Edit Title" Click="EditTitle_Click" Tag="{Binding}" />
+                                    <MenuFlyoutItem Text="Edit Author" Click="EditAuthor_Click" Tag="{Binding}" />
+                                    <MenuFlyoutItem Text="Change Location" Click="ChangeLocation_Click" Tag="{Binding}" />
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem Text="Delete" Click="DeleteFromMenu_Click" Tag="{Binding}">
+                                        <MenuFlyoutItem.Icon>
+                                            <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE74D;" />
+                                        </MenuFlyoutItem.Icon>
+                                    </MenuFlyoutItem>
+                                </MenuFlyout>
+                            </Button.Flyout>
+                        </Button>
                     </Grid>
                 </DataTemplate>
             </ListView.ItemTemplate>

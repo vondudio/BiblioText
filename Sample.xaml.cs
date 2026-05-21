@@ -16,8 +16,14 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Windows.Devices.Enumeration;
+using Windows.Graphics.Imaging;
+using Windows.Media.Capture;
+using Windows.Media.Capture.Frames;
+using Windows.Media.MediaProperties;
 using Windows.Storage;
 using Windows.Storage.Pickers;
+using Windows.Storage.Streams;
 
 namespace AIDevGallery.Sample;
 
@@ -339,6 +345,326 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         }
     }
 
+    private async void CaptureTile_Click(object sender, RoutedEventArgs e)
+    {
+        IReadOnlyList<DeviceInformation> cameras;
+        try
+        {
+            cameras = await DeviceInformation.FindAllAsync(DeviceClass.VideoCapture);
+        }
+        catch (Exception ex)
+        {
+            App.Window?.ShowException(ex, "Failed to enumerate cameras.");
+            return;
+        }
+
+        if (cameras.Count == 0)
+        {
+            var unavailableDialog = new ContentDialog
+            {
+                Title = "Camera unavailable",
+                Content = "No cameras were found on this device.",
+                CloseButtonText = "OK",
+                XamlRoot = this.XamlRoot,
+            };
+            await unavailableDialog.ShowAsync();
+            return;
+        }
+
+        MediaCapture? mediaCapture = null;
+        MediaFrameReader? frameReader = null;
+        SoftwareBitmapSource? previewSource = null;
+        bool isPreviewing = false;
+        bool isInitializingCamera = false;
+        bool isCapturingPhoto = false;
+        bool isUpdatingPreview = false;
+
+        var cameraPicker = new ComboBox
+        {
+            ItemsSource = cameras,
+            DisplayMemberPath = nameof(DeviceInformation.Name),
+            SelectedIndex = 0,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+
+        var previewImage = new Microsoft.UI.Xaml.Controls.Image
+        {
+            Width = 640,
+            Height = 480,
+            Stretch = Microsoft.UI.Xaml.Media.Stretch.Uniform,
+        };
+
+        var statusText = new TextBlock
+        {
+            Text = "Starting camera preview...",
+            Opacity = 0.8,
+            TextWrapping = TextWrapping.Wrap,
+        };
+
+        var takePhotoButton = new Button
+        {
+            Content = "Take Photo",
+            HorizontalAlignment = HorizontalAlignment.Left,
+            IsEnabled = false,
+        };
+
+        var dialog = new ContentDialog
+        {
+            Title = "Capture photo",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Close,
+            XamlRoot = this.XamlRoot,
+            Content = new StackPanel
+            {
+                Spacing = 12,
+                Children =
+                {
+                    new TextBlock
+                    {
+                        Text = "Camera",
+                        FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                    },
+                    cameraPicker,
+                    previewImage,
+                    statusText,
+                    takePhotoButton,
+                },
+            },
+        };
+
+        void FrameReader_FrameArrived(MediaFrameReader sender, MediaFrameArrivedEventArgs args)
+        {
+            if (isUpdatingPreview || previewSource == null)
+            {
+                return;
+            }
+
+            using var frame = sender.TryAcquireLatestFrame();
+            var softwareBitmap = frame?.VideoMediaFrame?.SoftwareBitmap;
+            if (softwareBitmap == null)
+            {
+                return;
+            }
+
+            SoftwareBitmap displayBitmap;
+            try
+            {
+                displayBitmap = SoftwareBitmap.Convert(softwareBitmap, BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to convert preview frame: {ex.Message}");
+                return;
+            }
+
+            isUpdatingPreview = true;
+            if (!DispatcherQueue.TryEnqueue(async () =>
+            {
+                try
+                {
+                    if (previewSource != null)
+                    {
+                        await previewSource.SetBitmapAsync(displayBitmap);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Failed to update preview frame: {ex.Message}");
+                }
+                finally
+                {
+                    displayBitmap.Dispose();
+                    isUpdatingPreview = false;
+                }
+            }))
+            {
+                displayBitmap.Dispose();
+                isUpdatingPreview = false;
+            }
+        }
+
+        async Task CleanupCameraAsync()
+        {
+            takePhotoButton.IsEnabled = false;
+
+            if (frameReader != null)
+            {
+                frameReader.FrameArrived -= FrameReader_FrameArrived;
+                try
+                {
+                    await frameReader.StopAsync();
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Failed to stop frame reader: {ex.Message}");
+                }
+                finally
+                {
+                    frameReader.Dispose();
+                    frameReader = null;
+                }
+            }
+
+            previewSource = null;
+            previewImage.Source = null;
+            isPreviewing = false;
+            isUpdatingPreview = false;
+
+            mediaCapture?.Dispose();
+            mediaCapture = null;
+        }
+
+        async Task<bool> InitializeCameraAsync(DeviceInformation device)
+        {
+            if (isInitializingCamera)
+            {
+                return false;
+            }
+
+            isInitializingCamera = true;
+            cameraPicker.IsEnabled = false;
+            takePhotoButton.IsEnabled = false;
+            statusText.Text = $"Starting {device.Name}...";
+
+            MediaCapture? nextCapture = null;
+            MediaFrameReader? nextFrameReader = null;
+            try
+            {
+                await CleanupCameraAsync();
+
+                nextCapture = new MediaCapture();
+                await nextCapture.InitializeAsync(new MediaCaptureInitializationSettings
+                {
+                    VideoDeviceId = device.Id,
+                    StreamingCaptureMode = StreamingCaptureMode.Video,
+                });
+
+                var frameSource = nextCapture.FrameSources.Values.FirstOrDefault(source =>
+                    source.Info.SourceKind == MediaFrameSourceKind.Color &&
+                    (source.Info.MediaStreamType == MediaStreamType.VideoPreview ||
+                     source.Info.MediaStreamType == MediaStreamType.VideoRecord));
+                if (frameSource == null)
+                {
+                    throw new InvalidOperationException("Selected camera does not expose a preview stream.");
+                }
+
+                nextFrameReader = await nextCapture.CreateFrameReaderAsync(frameSource, MediaEncodingSubtypes.Bgra8);
+                nextFrameReader.FrameArrived += FrameReader_FrameArrived;
+                nextFrameReader.AcquisitionMode = MediaFrameReaderAcquisitionMode.Realtime;
+                var startStatus = await nextFrameReader.StartAsync();
+                if (startStatus != MediaFrameReaderStartStatus.Success)
+                {
+                    throw new InvalidOperationException($"Preview frame reader could not start ({startStatus}).");
+                }
+
+                previewSource = new SoftwareBitmapSource();
+                previewImage.Source = previewSource;
+                mediaCapture = nextCapture;
+                frameReader = nextFrameReader;
+                isPreviewing = true;
+                statusText.Text = $"Previewing {device.Name}";
+                takePhotoButton.IsEnabled = true;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                if (nextFrameReader != null)
+                {
+                    nextFrameReader.FrameArrived -= FrameReader_FrameArrived;
+                    try
+                    {
+                        await nextFrameReader.StopAsync();
+                    }
+                    catch (Exception stopEx)
+                    {
+                        Debug.WriteLine($"Failed to stop frame reader after init failure: {stopEx.Message}");
+                    }
+                    nextFrameReader.Dispose();
+                }
+
+                nextCapture?.Dispose();
+                previewSource = null;
+                previewImage.Source = null;
+                statusText.Text = $"Unable to preview {device.Name}.";
+                App.Window?.ShowException(ex, $"Failed to start preview for '{device.Name}'.");
+                return false;
+            }
+            finally
+            {
+                cameraPicker.IsEnabled = true;
+                isInitializingCamera = false;
+            }
+        }
+
+        cameraPicker.SelectionChanged += async (_, _) =>
+        {
+            if (cameraPicker.SelectedItem is DeviceInformation selectedCamera && !isCapturingPhoto)
+            {
+                await InitializeCameraAsync(selectedCamera);
+            }
+        };
+
+        takePhotoButton.Click += async (_, _) =>
+        {
+            if (mediaCapture == null || isCapturingPhoto)
+            {
+                return;
+            }
+
+            isCapturingPhoto = true;
+            takePhotoButton.IsEnabled = false;
+            statusText.Text = "Capturing photo...";
+
+            try
+            {
+                using var photoStream = new InMemoryRandomAccessStream();
+                await mediaCapture.CapturePhotoToStreamAsync(ImageEncodingProperties.CreateJpeg(), photoStream);
+                photoStream.Seek(0);
+
+                string captureFolderPath = Path.Combine(Path.GetTempPath(), "YOLO_Captures");
+                Directory.CreateDirectory(captureFolderPath);
+
+                string fileName = $"capture_{DateTime.Now:yyyyMMdd_HHmmss}.jpg";
+                StorageFolder captureFolder = await StorageFolder.GetFolderFromPathAsync(captureFolderPath);
+                StorageFile captureFile = await captureFolder.CreateFileAsync(fileName, CreationCollisionOption.GenerateUniqueName);
+
+                using (var fileStream = await captureFile.OpenAsync(FileAccessMode.ReadWrite))
+                {
+                    await RandomAccessStream.CopyAsync(photoStream.GetInputStreamAt(0), fileStream.GetOutputStreamAt(0));
+                    await fileStream.FlushAsync();
+                }
+
+                await CleanupCameraAsync();
+                await AddImageAsync(captureFile.Path, activate: true);
+                dialog.Hide();
+            }
+            catch (Exception ex)
+            {
+                statusText.Text = "Capture failed. Try again.";
+                App.Window?.ShowException(ex, "Failed to capture photo.");
+                takePhotoButton.IsEnabled = mediaCapture != null && isPreviewing;
+            }
+            finally
+            {
+                isCapturingPhoto = false;
+            }
+        };
+
+        try
+        {
+            if (cameraPicker.SelectedItem is DeviceInformation initialCamera)
+            {
+                await InitializeCameraAsync(initialCamera);
+            }
+
+            await dialog.ShowAsync();
+        }
+        finally
+        {
+            await CleanupCameraAsync();
+        }
+    }
+
     private async void RemoveButton_Click(object sender, RoutedEventArgs e)
     {
         if (_activeImage == null)
@@ -498,7 +824,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         {
             if (App.Window is MainWindow mw)
             {
-                mw.NavigateToReview(candidates);
+                mw.NavigateToReview(candidates, _activeImage?.FilePath);
             }
         }
         else if (result == ContentDialogResult.Secondary)
@@ -573,7 +899,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
                 // Navigate to review page
                 if (App.Window is MainWindow mw)
                 {
-                    mw.NavigateToReview(candidates);
+                    mw.NavigateToReview(candidates, _activeImage?.FilePath);
                 }
             }
         }

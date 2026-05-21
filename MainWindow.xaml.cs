@@ -118,7 +118,7 @@ StackTrace: {ex.StackTrace}
     /// <summary>
     /// Navigate to the Review page and pass in candidates from an AI analysis or crop extraction.
     /// </summary>
-    internal void NavigateToReview(System.Collections.Generic.List<Models.ReviewCandidate> candidates)
+    internal void NavigateToReview(System.Collections.Generic.List<Models.ReviewCandidate> candidates, string? sourceImagePath)
     {
         // Select the Review nav item
         NavView.SelectedItem = NavView.MenuItems[1];
@@ -127,7 +127,7 @@ StackTrace: {ex.StackTrace}
         // Pass candidates to the page after navigation
         if (RootFrame.Content is Pages.ReviewPage reviewPage)
         {
-            reviewPage.SetCandidates(candidates);
+            reviewPage.SetCandidates(candidates, sourceImagePath);
         }
     }
 }
