@@ -347,6 +347,21 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
 
     private async void CaptureTile_Click(object sender, RoutedEventArgs e)
     {
+        // Check if camera is enabled in settings
+        var appSettings = App.SettingsStore?.Load();
+        if (appSettings != null && !appSettings.UseCameraCapture)
+        {
+            var disabledDialog = new ContentDialog
+            {
+                Title = "Camera disabled",
+                Content = "Camera capture is disabled. Enable it in Settings.",
+                CloseButtonText = "OK",
+                XamlRoot = this.XamlRoot,
+            };
+            await disabledDialog.ShowAsync();
+            return;
+        }
+
         IReadOnlyList<DeviceInformation> cameras;
         try
         {
@@ -661,20 +676,16 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
             }
         };
 
-        try
+        dialog.Opened += async (s, args) =>
         {
-            bool cameraReady = false;
             if (cameraPicker.SelectedItem is DeviceInformation initialCamera)
             {
-                cameraReady = await InitializeCameraAsync(initialCamera);
+                await InitializeCameraAsync(initialCamera);
             }
+        };
 
-            if (!cameraReady && cameras.Count <= 1)
-            {
-                // Camera init failed and no alternatives — don't show dialog.
-                return;
-            }
-
+        try
+        {
             await dialog.ShowAsync();
         }
         finally

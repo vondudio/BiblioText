@@ -24,6 +24,7 @@ public sealed partial class SettingsPage : Page
         ApiKeyBox.Password = settings.AzureOpenAiApiKey ?? "";
         DeploymentBox.Text = settings.AzureOpenAiDeployment ?? "";
         ApiVersionBox.Text = settings.ApiVersion ?? "2024-10-21";
+        UseCameraToggle.IsOn = settings.UseCameraCapture;
     }
 
     private void SaveButton_Click(object sender, RoutedEventArgs e)
@@ -36,7 +37,8 @@ public sealed partial class SettingsPage : Page
             AzureOpenAiEndpoint = EndpointBox.Text.Trim(),
             AzureOpenAiApiKey = ApiKeyBox.Password,
             AzureOpenAiDeployment = DeploymentBox.Text.Trim(),
-            ApiVersion = ApiVersionBox.Text.Trim()
+            ApiVersion = ApiVersionBox.Text.Trim(),
+            UseCameraCapture = UseCameraToggle.IsOn,
         };
 
         store.Save(settings);
@@ -44,6 +46,16 @@ public sealed partial class SettingsPage : Page
         StatusBar.IsOpen = true;
         StatusBar.Severity = InfoBarSeverity.Success;
         StatusBar.Message = "Settings saved successfully.";
+    }
+
+    private void UseCameraToggle_Toggled(object sender, RoutedEventArgs e)
+    {
+        var store = App.SettingsStore;
+        if (store == null) return;
+
+        var settings = store.Load();
+        settings.UseCameraCapture = UseCameraToggle.IsOn;
+        store.Save(settings);
     }
 
     private async void TestButton_Click(object sender, RoutedEventArgs e)

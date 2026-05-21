@@ -64,6 +64,17 @@
                 <TextBlock TextWrapping="Wrap" Opacity="0.6" FontSize="12"
                     Text="If no settings are saved above, the app will try these environment variables: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT, AZURE_OPENAI_API_VERSION" />
             </StackPanel>
+
+            <!-- Camera -->
+            <StackPanel Spacing="12">
+                <TextBlock Text="Camera" Style="{StaticResource SubtitleTextBlockStyle}" />
+                <ToggleSwitch
+                    x:Name="UseCameraToggle"
+                    Header="Use camera capture"
+                    OffContent="Disabled"
+                    OnContent="Enabled"
+                    Toggled="UseCameraToggle_Toggled" />
+            </StackPanel>
         </StackPanel>
     </ScrollViewer>
 </Page>
