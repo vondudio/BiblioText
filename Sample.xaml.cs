@@ -416,18 +416,13 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
             TextWrapping = TextWrapping.Wrap,
         };
 
-        var takePhotoButton = new Button
-        {
-            Content = "Take Photo",
-            HorizontalAlignment = HorizontalAlignment.Left,
-            IsEnabled = false,
-        };
-
         var dialog = new ContentDialog
         {
             Title = "Capture photo",
             CloseButtonText = "Cancel",
-            DefaultButton = ContentDialogButton.Close,
+            PrimaryButtonText = "Take Photo",
+            IsPrimaryButtonEnabled = false,
+            DefaultButton = ContentDialogButton.Primary,
             XamlRoot = this.XamlRoot,
             Content = new StackPanel
             {
@@ -442,7 +437,6 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
                     cameraPicker,
                     previewImage,
                     statusText,
-                    takePhotoButton,
                 },
             },
         };
@@ -500,7 +494,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
 
         async Task CleanupCameraAsync()
         {
-            takePhotoButton.IsEnabled = false;
+            dialog.IsPrimaryButtonEnabled = false;
 
             if (frameReader != null)
             {
@@ -538,7 +532,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
 
             isInitializingCamera = true;
             cameraPicker.IsEnabled = false;
-            takePhotoButton.IsEnabled = false;
+            dialog.IsPrimaryButtonEnabled = false;
             statusText.Text = $"Starting {device.Name}...";
 
             MediaCapture? nextCapture = null;
@@ -588,7 +582,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
                 frameReader = nextFrameReader;
                 isPreviewing = true;
                 statusText.Text = $"Previewing {device.Name}";
-                takePhotoButton.IsEnabled = true;
+                dialog.IsPrimaryButtonEnabled = true;
                 return true;
             }
             catch (Exception ex)
@@ -629,32 +623,35 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
             }
         };
 
-        takePhotoButton.Click += async (_, _) =>
+        dialog.PrimaryButtonClick += async (s, args) =>
         {
+            // Defer closing so we can do async work
+            var deferral = args.GetDeferral();
+            args.Cancel = true; // prevent auto-close; we'll call dialog.Hide() on success
+
             if (frameReader == null || isCapturingPhoto)
             {
+                deferral.Complete();
                 return;
             }
 
             isCapturingPhoto = true;
-            takePhotoButton.IsEnabled = false;
+            dialog.IsPrimaryButtonEnabled = false;
             statusText.Text = "Capturing photo...";
 
             try
             {
-                // Grab the latest frame from the reader instead of CapturePhotoToStreamAsync
-                // which is unreliable with StreamingCaptureMode.Video on ARM64.
                 using var frame = frameReader.TryAcquireLatestFrame();
                 var softwareBitmap = frame?.VideoMediaFrame?.SoftwareBitmap;
                 if (softwareBitmap == null)
                 {
                     statusText.Text = "No frame available. Try again.";
-                    takePhotoButton.IsEnabled = true;
+                    dialog.IsPrimaryButtonEnabled = true;
                     isCapturingPhoto = false;
+                    deferral.Complete();
                     return;
                 }
 
-                // Convert to Bgra8 for encoding
                 using var convertedBitmap = SoftwareBitmap.Convert(softwareBitmap, BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied);
 
                 string captureFolderPath = Path.Combine(Path.GetTempPath(), "YOLO_Captures");
@@ -671,14 +668,15 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
                 }
 
                 await CleanupCameraAsync();
-                await AddImageAsync(filePath, activate: true);
+                deferral.Complete();
                 dialog.Hide();
+                await AddImageAsync(filePath, activate: true);
             }
             catch (Exception ex)
             {
                 statusText.Text = "Capture failed. Try again.";
-                App.Window?.ShowException(ex, "Failed to capture photo.");
-                takePhotoButton.IsEnabled = frameReader != null && isPreviewing;
+                dialog.IsPrimaryButtonEnabled = frameReader != null && isPreviewing;
+                deferral.Complete();
             }
             finally
             {
