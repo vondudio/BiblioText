@@ -35,4 +35,7 @@ public sealed partial class ReviewCandidate : ObservableObject
 
     [ObservableProperty]
     public partial double Confidence { get; set; }
+
+    /// <summary>Formatted display string showing bounding box ID and confidence.</summary>
+    public string DisplayLabel => $"#{Index}  •  {Confidence:P0}";
 }

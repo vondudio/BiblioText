@@ -83,7 +83,15 @@
                                     Glyph="&#xE736;"
                                     FontSize="20"
                                     Opacity="0.3" />
-                                <Image Source="{Binding SpineImagePath}" Stretch="UniformToFill" />
+                                <Image Source="{Binding SpineImage}" Stretch="UniformToFill" />
+                                <Border
+                                    HorizontalAlignment="Left"
+                                    VerticalAlignment="Top"
+                                    Background="{ThemeResource AccentFillColorDefaultBrush}"
+                                    CornerRadius="0,0,4,0"
+                                    Padding="3,1">
+                                    <TextBlock Text="{Binding DetectionLabel}" FontSize="9" Foreground="White" FontWeight="Bold" />
+                                </Border>
                             </Grid>
                         </Border>
 

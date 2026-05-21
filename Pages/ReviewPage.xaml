@@ -51,7 +51,8 @@
             x:Name="ReviewList"
             Grid.Row="3"
             SelectionMode="None"
-            Visibility="Collapsed">
+            Visibility="Collapsed"
+            ContainerContentChanging="ReviewList_ContainerContentChanging">
             <ListView.ItemTemplate>
                 <DataTemplate>
                     <Grid Padding="8" ColumnSpacing="12">
@@ -74,6 +75,11 @@
 
                         <!-- Editable fields -->
                         <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="8">
+                            <TextBlock
+                                Text="{Binding DisplayLabel}"
+                                FontSize="11"
+                                Opacity="0.5"
+                                FontFamily="Consolas" />
                             <TextBox
                                 Header="Title"
                                 Text="{Binding EditedTitle, Mode=TwoWay}"
@@ -82,10 +88,6 @@
                                 Header="Author"
                                 Text="{Binding EditedAuthor, Mode=TwoWay}"
                                 PlaceholderText="Author (optional)" />
-                            <TextBlock
-                                Text="{Binding Confidence}"
-                                Opacity="0.5"
-                                FontSize="12" />
                         </StackPanel>
 
                         <!-- Accept/Reject toggle -->

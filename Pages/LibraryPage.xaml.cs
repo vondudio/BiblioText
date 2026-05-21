@@ -271,14 +271,26 @@ internal sealed class BookDisplay
         Title = book.Title;
         Author = book.Author ?? "";
         SpineImagePath = book.SpineImagePath;
+        BookshelfImagePath = book.BookshelfImagePath;
+        DetectionIndex = book.DetectionIndex;
         LocationName = locationName ?? "";
         CreatedAtDisplay = book.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd");
+
+        // Load spine image from file path
+        if (!string.IsNullOrEmpty(SpineImagePath) && System.IO.File.Exists(SpineImagePath))
+        {
+            SpineImage = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(SpineImagePath));
+        }
     }
 
     public int Id { get; }
     public string Title { get; }
     public string Author { get; }
     public string? SpineImagePath { get; }
+    public string? BookshelfImagePath { get; }
+    public int? DetectionIndex { get; }
+    public Microsoft.UI.Xaml.Media.Imaging.BitmapImage? SpineImage { get; }
     public string LocationName { get; }
     public string CreatedAtDisplay { get; }
+    public string DetectionLabel => DetectionIndex.HasValue ? $"#{DetectionIndex}" : "";
 }

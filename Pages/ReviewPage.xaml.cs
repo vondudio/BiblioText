@@ -137,6 +137,25 @@ public sealed partial class ReviewPage : Page
         }
     }
 
+    private void ReviewList_ContainerContentChanging(ListViewBase sender, ContainerContentChangingEventArgs args)
+    {
+        if (args.InRecycleQueue) return;
+
+        if (args.Item is ReviewCandidate candidate && candidate.CropJpeg is { Length: > 0 })
+        {
+            // Find the Image control named "CropImage" in the template
+            var grid = args.ItemContainer.ContentTemplateRoot as Grid;
+            var border = grid?.Children.OfType<Border>().FirstOrDefault();
+            if (border?.Child is Image cropImage)
+            {
+                var bitmapImage = new BitmapImage();
+                using var stream = new MemoryStream(candidate.CropJpeg);
+                bitmapImage.SetSource(stream.AsRandomAccessStream());
+                cropImage.Source = bitmapImage;
+            }
+        }
+    }
+
     private void RejectAllButton_Click(object sender, RoutedEventArgs e)
     {
         foreach (var c in _candidates)
@@ -187,6 +206,8 @@ public sealed partial class ReviewPage : Page
                 Title = string.IsNullOrWhiteSpace(candidate.EditedTitle) ? candidate.DetectedTitle : candidate.EditedTitle,
                 Author = string.IsNullOrWhiteSpace(candidate.EditedAuthor) ? candidate.DetectedAuthor : candidate.EditedAuthor,
                 LocationId = locationId,
+                DetectionIndex = candidate.Index > 0 ? candidate.Index : null,
+                BookshelfImagePath = _sourceImagePath,
                 CreatedAt = DateTime.UtcNow
             };
 

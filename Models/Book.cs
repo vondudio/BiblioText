@@ -12,6 +12,8 @@ public sealed class Book
     public int? ScanId { get; set; }
     public int? LocationId { get; set; }
     public string? SpineImagePath { get; set; }
+    public string? BookshelfImagePath { get; set; }
+    public int? DetectionIndex { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? ModifiedAt { get; set; }
     public bool IsDuplicate { get; set; }
