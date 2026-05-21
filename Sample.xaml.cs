@@ -795,7 +795,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
             }
             candidates.Add(new Models.ReviewCandidate
             {
-                Index = i,
+                Index = i + 1,
                 DetectedTitle = detectedTitle,
                 DetectedAuthor = detectedAuthor,
                 EditedTitle = detectedTitle,
@@ -906,6 +906,22 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
             {
                 App.Window?.ShowException(null, "AI analysis returned no books. Try adjusting the image or check Settings.");
                 return;
+            }
+
+            // Attach cropped bounding box images to each candidate if detections are available
+            if (_activeImage.Outputs.TryGetValue(CacheKey(), out var cachedForCrop) && cachedForCrop.BoxPredictions.Count > 0)
+            {
+                var opts = new CropExtractorOptions { PaddingPx = 4, MaxLongEdgePx = 512, JpegQuality = 80, FillColor = Color.White };
+                var crops = await Task.Run(() => CropExtractor.Extract(
+                    _activeImage.SourceBitmap, cachedForCrop.MaskedPredictions, cachedForCrop.BoxPredictions, opts));
+
+                for (int i = 0; i < candidates.Count && i < crops.Count; i++)
+                {
+                    candidates[i].CropJpeg = crops[i].Jpeg;
+                    candidates[i].PixelWidth = crops[i].PixelWidth;
+                    candidates[i].PixelHeight = crops[i].PixelHeight;
+                    candidates[i].Index = i + 1; // 1-based to match bounding box labels
+                }
             }
 
             // Store candidates for the Review page to pick up

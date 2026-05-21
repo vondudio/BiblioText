@@ -111,12 +111,10 @@ public sealed partial class ReviewPage : Page
         }
     }
 
-    private void ImageOverlay_PointerPressed(object sender, PointerRoutedEventArgs e)
+    private void ImageOverlay_Tapped(object sender, TappedRoutedEventArgs e)
     {
-        if (ReferenceEquals(e.OriginalSource, ImageOverlay) || e.OriginalSource is Grid { Name: nameof(ImageOverlay) })
-        {
-            ImageOverlay.Visibility = Visibility.Collapsed;
-        }
+        // Close overlay when tapping the background (not the image/scrollviewer content)
+        ImageOverlay.Visibility = Visibility.Collapsed;
     }
 
     private void OverlayScroller_DoubleTapped(object sender, DoubleTappedRoutedEventArgs e)

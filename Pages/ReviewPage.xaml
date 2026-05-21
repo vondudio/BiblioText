@@ -151,7 +151,7 @@
             Grid.RowSpan="99"
             Background="{ThemeResource SmokeFillColorDefaultBrush}"
             Visibility="Collapsed"
-            PointerPressed="ImageOverlay_PointerPressed">
+            Tapped="ImageOverlay_Tapped">
             <ScrollViewer
                 x:Name="OverlayScroller"
                 ZoomMode="Enabled"

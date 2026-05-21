@@ -67,7 +67,7 @@ internal sealed class ScanWorkflowService
 
             candidates.Add(new ReviewCandidate
             {
-                Index = i,
+                Index = i + 1,
                 DetectedTitle = detectedTitle,
                 DetectedAuthor = detectedAuthor,
                 EditedTitle = detectedTitle,
@@ -115,7 +115,7 @@ internal sealed class ScanWorkflowService
             var book = result.Books[i];
             candidates.Add(new ReviewCandidate
             {
-                Index = i,
+                Index = i + 1,
                 DetectedTitle = book.Title,
                 DetectedAuthor = book.Author,
                 EditedTitle = book.Title,
