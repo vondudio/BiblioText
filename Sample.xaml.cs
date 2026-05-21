@@ -547,20 +547,30 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
             {
                 await CleanupCameraAsync();
 
+                // Find a SourceGroup that includes this device
+                var sourceGroups = await MediaFrameSourceGroup.FindAllAsync();
+                var matchingGroup = sourceGroups.FirstOrDefault(g =>
+                    g.SourceInfos.Any(si => si.DeviceInformation?.Id == device.Id && si.SourceKind == MediaFrameSourceKind.Color));
+
                 nextCapture = new MediaCapture();
-                await nextCapture.InitializeAsync(new MediaCaptureInitializationSettings
+                var initSettings = new MediaCaptureInitializationSettings
                 {
                     VideoDeviceId = device.Id,
                     StreamingCaptureMode = StreamingCaptureMode.Video,
-                });
+                    MemoryPreference = MediaCaptureMemoryPreference.Cpu,
+                };
+                if (matchingGroup != null)
+                {
+                    initSettings.SourceGroup = matchingGroup;
+                }
+                await nextCapture.InitializeAsync(initSettings);
 
+                // Accept any color frame source
                 var frameSource = nextCapture.FrameSources.Values.FirstOrDefault(source =>
-                    source.Info.SourceKind == MediaFrameSourceKind.Color &&
-                    (source.Info.MediaStreamType == MediaStreamType.VideoPreview ||
-                     source.Info.MediaStreamType == MediaStreamType.VideoRecord));
+                    source.Info.SourceKind == MediaFrameSourceKind.Color);
                 if (frameSource == null)
                 {
-                    throw new InvalidOperationException("Selected camera does not expose a preview stream.");
+                    throw new InvalidOperationException("Selected camera does not expose a color frame source.");
                 }
 
                 nextFrameReader = await nextCapture.CreateFrameReaderAsync(frameSource, MediaEncodingSubtypes.Bgra8);
