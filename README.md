@@ -1,8 +1,17 @@
-# YOLO Object Detection Sample
+# BiblioText
 
-A WinUI 3 / .NET 9 desktop sample (`AIDevGallery.Sample`) that runs YOLO object detectors on the local machine via [ONNX Runtime](https://onnxruntime.ai/) + the Windows AI `ExecutionProviderCatalog`. Pick an image with the upload button, choose a model from the picker, and the boxes are drawn over the source bitmap.
+A WinUI 3 / .NET 9 desktop application for scanning bookshelves, detecting individual book spines with YOLO object detection, and extracting titles and authors via Azure OpenAI vision. Detected books are reviewed, edited, and saved to a local SQLite library with bookshelf location tagging.
 
-The sample now ships with two model families:
+## Features
+
+- **Scan** — Load bookshelf photos (file picker, drag-and-drop, or live camera capture) and run YOLO detection to identify individual book spines with numbered bounding boxes.
+- **AI Analysis** — Send the annotated bookshelf image to Azure OpenAI GPT-5.4 vision to extract title and author for each numbered detection.
+- **Review** — Review detected books with editable title/author fields, cropped spine thumbnails, accept/reject per item, and bookshelf location tagging before committing to the library.
+- **Library** — Browse all saved books with spine images, detection index badges, and inline editing of title/author via ellipsis menu.
+- **Camera Capture** — On-device camera (front/rear selectable) with live preview dialog and still photo capture for processing.
+- **Settings** — Configure Azure OpenAI endpoint, API key, deployment name, and camera preferences.
+
+## Detection Models
 
 | Family | Files | Head | Output | Postprocess |
 |---|---|---|---|---|
@@ -20,6 +29,7 @@ The `Models\ModelInfo.cs` registry only lists models whose `.onnx` is actually p
 - Visual Studio 2022 17.12+ with the **Universal Windows Platform development** workload (the `.vsconfig` in the repo pins this) and the **.NET Desktop / WinUI** components, or:
 - The **.NET 10 SDK** + **Windows 11 SDK 26100** + **Windows App SDK 2.0 experimental** runtime.
 - (Optional, for YOLO26 weights) **Python 3.8+** on `PATH`.
+- (Optional, for AI analysis) **Azure OpenAI** resource with a GPT-5.4 vision deployment.
 
 ---
 
@@ -29,15 +39,14 @@ The `Models\ModelInfo.cs` registry only lists models whose `.onnx` is actually p
 1. Open `YOLO_Object_DetectionSample.sln`.
 2. Solution Platform → **x64** (or **ARM64** on Snapdragon).
 3. Right-click the project → **Set as Startup Project** → **F5** (deploys as a packaged WinUI app).
-4. Default image (`Assets\team.jpg`) is detected on launch. Use the upload button for any `.png`, `.jpg`, `.jpeg`, or `.bmp`.
 
 ### From the command line
 ```pwsh
 dotnet restore .\YOLO_Object_DetectionSample.csproj
-dotnet build   .\YOLO_Object_DetectionSample.csproj -c Debug   -p:Platform=x64
-dotnet build   .\YOLO_Object_DetectionSample.csproj -c Release -p:Platform=x64
+dotnet build   .\YOLO_Object_DetectionSample.csproj -c Debug   -p:Platform=ARM64
+dotnet build   .\YOLO_Object_DetectionSample.csproj -c Release -p:Platform=ARM64
 ```
-Use `-p:Platform=ARM64` on Snapdragon devices.
+Use `-p:Platform=x64` on Intel/AMD devices.
 
 ---
 
@@ -89,77 +98,155 @@ glob picks up the new files automatically.
 
 ## UI
 
-- **Model picker** (top right) — lists every model whose `.onnx` is present in `Models\`. Switching models disposes the current `InferenceSession`, reloads, and re-activates the current image (cache hit on the new `(modelId, confidence)` key is instant).
-- **Confidence slider + spin entry** (top right) — slider has a TextBox + RepeatButton spinner pair coupled to it.
-  - Inference only re-runs **on slider release** (pointer up / capture lost) — dragging never spams the model.
-  - Keyboard nudges and spin-button clicks fall through a 350 ms `DispatcherTimer` debounce.
-  - Defaults: 0.5 for yolov4, 0.45 for YOLO26 medium (the launch default), 0.25 for the other YOLO26 sizes.
-- **Status bar** (bottom left) — detection count and stage timings: `pre`, `infer`, `post`, `total` ms. Shows `(cached)` when a previously-computed result is restored from the per-image cache.
+The app uses a **NavigationView** shell with four pages:
 
-### Bottom queue strip
-- **`QUEUE / PENDING`** panel docked below the main viewer, with a live "N ITEMS" counter on the right.
-- **120 × 120 thumbnail tiles** showing the filename underneath. The active tile gets an accent-color border. Click a tile to make it active.
-- **Import New Scan tile** (last item in the strip) — dashed-border tile with an up-arrow icon. Click to open the multi-file picker; the first selected file becomes active, the rest are appended.
-- **Drag-and-drop** — drop one or more `.png` / `.jpg` / `.jpeg` / `.bmp` files anywhere on the main viewer or the strip to add them. Other extensions are silently skipped.
-- **REMOVE button** at the bottom-left of the panel deletes the active image, disposes its bitmaps + cache, and activates the neighboring tile.
-- **EXTRACT TITLES button** next to REMOVE. Crops every detection on the active image, JPEG-encodes each crop (default ≤1024 px long edge, quality 85), saves them to `%TEMP%\YOLO_Crops\<image-stem>_<HHmmss>\` for human inspection, and pipes each through `IBookTitleExtractor.ExtractAsync(...)`. Result dialog shows per-crop dimensions + bytes + the extracted title with a button to open the temp folder. Uses `StubBookTitleExtractor` today; swap to a real Azure OpenAI GPT-5.4 client at `Services\StubBookTitleExtractor.cs` (the file's XML doc has the exact data-URL + endpoint contract).
-- **Per-image cache.** Each `ImageItem` keeps a `Dictionary<(modelId|conf2dp), CachedOutput>` of rendered outputs + the underlying predictions (and per-pixel masks for `-seg` models). Switching back to an image you've already processed at the current model + confidence shows the result instantly with `(cached)` in the status bar — no re-inference. EXTRACT TITLES uses the cached predictions directly so it never re-runs the model.
+### Scan Page
+- **Model picker** (top right) — lists every model whose `.onnx` is present in `Models\`. Switching models re-runs detection.
+- **Confidence slider** — inference re-runs only on slider release (no spamming on drag).
+- **Upload / Drag-and-drop** — import `.png`, `.jpg`, `.jpeg`, `.bmp` files.
+- **Camera Capture** — opens a dialog with live camera preview (front/rear selectable) and captures a still photo at the device's native resolution.
+- **Queue strip** (bottom) — thumbnail tiles of loaded images with an import tile and remove button.
+- **EXTRACT TITLES** — crops each detection and sends to AI for title/author extraction.
+- **AI ANALYZE** — sends the full annotated image (with numbered bounding boxes) to Azure OpenAI GPT-5.4 vision. The AI references detections by their numbered labels.
+- **Numbered bounding boxes** — each detection gets a 1-based numerical ID badge drawn on the image.
 
-### Segmentation models (`-seg`)
-Selecting any `yolo26{n,s,m,l}-seg` entry in the model picker switches the inference path to use the prototype-mask output. The viewer overlays a translucent class-colored mask under the bounding box. EXTRACT TITLES then uses those per-pixel masks to crop with the background filled white (cleaner OCR / vision-model input than a rectangular crop). Run `.\scripts\download-models.ps1 -Tasks seg` to fetch the seg files; missing files are silently filtered out of the picker.
+### Review Page
+- Lists detected books with editable title and author fields.
+- Cropped spine thumbnail to the left of each item — click to view an enlarged zoomable overlay.
+- Accept/reject toggle per book.
+- **Location dropdown** — assign a bookshelf location before saving.
+- **Save to Library** — commits accepted books to the SQLite database.
 
-### Image viewer
-- The image fills the available window space at 1× while preserving aspect ratio (`Viewbox` + `Stretch="Uniform"` inside a `ScrollViewer` whose viewport drives the Viewbox dimensions).
-- **Mouse wheel** zooms in/out — plain scroll, no Ctrl required. ~10% per notch, capped at **3×**, anchored on the cursor so the pixel under the pointer stays put.
-- **Left-click + drag** pans the image when zoomed in (`ZoomFactor > 1`); the gesture captures the pointer and drives `ScrollViewer.ChangeView` from the pointer delta.
-- **Double-click** resets to 1× and scrolls back to (0, 0).
-- **EXIF orientation** is normalized at load time (`BitmapFunctions.NormalizeOrientation`) so phone-camera portraits with `Orientation=6` are inferenced and rendered upright — boxes line up with the displayed `BitmapImage`, which honors EXIF natively.
+### Library Page
+- Browse all saved books with spine image thumbnails and detection index badges.
+- Ellipsis menu per book for inline editing of title or author.
+- Books display their bookshelf location.
 
----
+### Settings Page
+- Azure OpenAI endpoint, API key, and deployment name configuration.
+- Camera toggle (enable/disable camera capture feature).
 
-## Manual test matrix
-
-There are no automated tests in this repo. Smoke-test with the matrix below after any change to the inference pipeline:
-
-| Model | Expected output on `Assets\team.jpg` |
-|---|---|
-| `yolov4` | Several `person` boxes (legacy decoder) |
-| `yolo26n` (E2E) | Same `person` set, lower latency, no NMS step in the status bar |
-| `yolo26s` (E2E) | Same set with higher confidence scores |
-| `yolo26m` (E2E) | Same set + occasional secondary-object boxes (`tie`, `cell phone`) |
-| `yolo26{n,s,m}-o2m` | Same boxes as the E2E counterparts; postprocessing `post` time is non-zero (NMS) |
-
-Also smoke-test the **viewer**: scroll-zoom up to 3× anchored on the cursor, left-drag to pan, double-click to reset, and drag the confidence slider end-to-end — the model should re-run only once when you let go. Drop an upright phone-camera JPEG (EXIF Orientation 6) on the upload picker and confirm both the image and its boxes display upright, not sideways.
-
-Smoke-test the **queue strip**: import 2-3 photos via the Import New Scan tile, click between tiles (active one gets the accent border, image swaps with no stale boxes), drag-and-drop another file onto the viewer (it appends), change models — every tile keeps its own cache so switching back is instant with `(cached)` in the status bar. Hit REMOVE on the active tile; its neighbor activates and the count decrements.
-
-Run on each EP available on your machine (CPU + DirectML on x64; CPU + QNN on Snapdragon X). The current UI uses the CPU EP; non-CPU EPs are wired up in `Utils\WinMLHelpers.cs` for callers that want to add an EP picker.
+### Image Viewer (Scan Page)
+- Mouse wheel zooms (no Ctrl needed), capped at 3×, anchored on cursor position.
+- Left-click + drag pans when zoomed in.
+- Double-click resets to 1×.
+- EXIF orientation is normalized at load time.
 
 ---
 
-## Project layout
+## Architecture
 
 ```
-Models\
-  ModelInfo.cs       # ModelInfo record + ModelRegistry (file-presence filtered; yolo26m is the launch default)
-  ImageItem.cs       # One loaded image: pristine bitmap + pre-decoded BitmapImage + thumbnail + per-(model,conf) cache
-  CocoLabels.cs      # 80 canonical COCO classes (YOLO26 returns 0..79)
-  yolov4.onnx        # bundled legacy model
-  yolo26*.onnx       # downloaded by scripts\download-models.ps1
-Utils\
-  BitmapFunctions.cs # Resize, letterbox, NCHW & NHWC preprocess, render boxes, EXIF orientation normalization
-  Letterbox.cs       # Scale/pad math + UndoOnBox helper for postprocess
-  YOLOHelpers.cs     # ExtractPredictions (v4), ExtractYolo26EndToEnd, ExtractYolo26OneToMany, ApplyNms
-  WinMLHelpers.cs    # ExecutionProvider plumbing (DML/QNN/OpenVINO/EPContext)
-  DeviceUtils.cs     # DXGI adapter & EP enumeration
-scripts\
-  download-models.ps1
-Sample.xaml          # Main viewer (row 0) + bottom QUEUE/PENDING thumbnail strip (row 1)
-Sample.xaml.cs       # ObservableCollection<ImageItem> _images, ActivateImageAsync, DetectObjects, wheel-zoom + pan + slider debounce
-SelectedBorderThicknessConverter.cs  # Toggles tile accent ring from ImageItem.IsSelected
-MainWindow.xaml.cs   # Mica window host, ShowException, ModelLoaded
-App.xaml             # Registers SelectedBorderThicknessConverter as a global resource
-App.xaml.cs          # Application entry
+┌─────────────────────────────────────────────────────┐
+│  MainWindow.xaml  (NavigationView shell)            │
+│  ├── Sample.xaml         (Scan page)                │
+│  ├── Pages/ReviewPage    (Review detected books)    │
+│  ├── Pages/LibraryPage   (Saved book library)       │
+│  └── Pages/SettingsPage  (Configuration)            │
+└─────────────────────────────────────────────────────┘
+
+Models/           Domain models (Book, ReviewCandidate, ImageItem, Scan, Location)
+Services/         AI integration (AzureOpenAiAnalysisClient, CropExtractor, ScanWorkflowService)
+Persistence/      SQLite repository (ILibraryRepository, SqliteLibraryRepository)
+Settings/         Encrypted settings storage (DPAPI + environment variable fallback)
+Utils/            Image processing (BitmapFunctions, YOLOHelpers, Letterbox)
+ViewModels/       MVVM view models (CommunityToolkit.Mvvm)
+scripts/          Model download automation
+```
+
+### Key Design Decisions
+- **NavigationCacheMode.Required** on all pages — pane state is preserved when navigating between tabs.
+- **Per-image inference cache** — switching back to a previously-processed image is instant.
+- **Camera via MediaCapture API** — uses `CapturePhotoToStreamAsync` for still photos (not frame grab). On ARM64, discovers `MediaFrameSourceGroup` matching the device for reliable preview.
+- **Single ContentDialog rule** — WinUI 3 only allows one ContentDialog open at a time; camera dialog uses `Opened` event for deferred init.
+- **Azure OpenAI GPT-5.4** — uses `max_completion_tokens` (not `max_tokens`), `api-key` header, API version `2024-10-21`.
+- **SQLite persistence** — auto-migrates schema with `ALTER TABLE ADD COLUMN` for new fields.
+
+---
+
+## Configuration
+
+On first launch, go to **Settings** and configure:
+
+| Setting | Description |
+|---|---|
+| Azure OpenAI Endpoint | e.g. `https://your-resource.openai.azure.com/` |
+| API Key | Your Azure OpenAI resource key |
+| Deployment Name | The GPT-5.4 (or compatible vision model) deployment name |
+
+Settings are encrypted at rest using DPAPI and stored in the app's local data folder.
+
+---
+
+## Manual Test Matrix
+
+| Area | Test |
+|---|---|
+| **Scan** | Import image → run detection → numbered boxes appear |
+| **Camera** | Click Capture → preview shows → take photo → image loads for detection |
+| **AI Analyze** | Run detection → click AI Analyze → titles/authors populate → navigate to Review |
+| **Extract Titles** | Run detection → Extract Titles → crops saved to temp → per-crop results shown |
+| **Review** | Accept/reject books, edit title/author, set location, click crop thumbnail → overlay |
+| **Review overlay** | Tap overlay → closes; zoom in overlay → pinch/scroll works |
+| **Library** | Save from Review → books appear with spine images and detection badges |
+| **Library edit** | Ellipsis → edit title/author → changes persist |
+| **Settings** | Set Azure endpoint + key + deployment → values persist across restart |
+| **Navigation** | Switch between pages → state preserved (NavigationCacheMode) |
+| **Models** | Switch model in picker → re-detects with new model |
+| **Confidence** | Drag slider → re-detects only on release |
+| **Zoom** | Scroll-zoom to 3×, drag pan, double-click reset |
+
+Run on each EP available on your machine (CPU + DirectML on x64; CPU + QNN on Snapdragon X).
+
+---
+
+## Project Layout
+
+```
+Models/
+  ModelInfo.cs              # ModelInfo record + ModelRegistry (file-presence filtered)
+  ImageItem.cs             # Loaded image: bitmap + thumbnail + per-(model,conf) cache
+  Book.cs                  # Book entity (title, author, location, spine image, detection index)
+  ReviewCandidate.cs       # Detection candidate for review (crop, confidence, index)
+  Location.cs              # Bookshelf location model
+  Scan.cs                  # Scan session model
+  CocoLabels.cs            # 80 COCO classes
+  yolov4.onnx              # Bundled legacy model
+  yolo26*.onnx             # Downloaded by scripts\download-models.ps1
+
+Pages/
+  ReviewPage.xaml(.cs)     # Review detected books, crop overlay, location tagging
+  LibraryPage.xaml(.cs)    # Browse saved library with spine images
+  SettingsPage.xaml(.cs)   # Azure OpenAI + camera configuration
+
+Services/
+  AzureOpenAiAnalysisClient.cs   # GPT-5.4 vision API for full-image analysis
+  AzureOpenAiTitleExtractor.cs   # Per-crop title extraction
+  CropExtractor.cs               # Crop bounding boxes from detection results
+  ScanWorkflowService.cs         # Orchestrates crop → AI → ReviewCandidate pipeline
+  BookshelfAnalysisPrompt.cs     # System prompt for bookshelf AI analysis
+
+Persistence/
+  ILibraryRepository.cs          # Repository interface
+  SqliteLibraryRepository.cs     # SQLite CRUD with auto-migration
+
+Settings/
+  AppSettings.cs                 # App configuration model
+  DpapiSettingsStore.cs          # DPAPI-encrypted settings storage
+  CompositeSettingsStore.cs      # Cascading settings (DPAPI → environment)
+
+Utils/
+  BitmapFunctions.cs       # Resize, letterbox, NCHW/NHWC, render boxes with ID badges
+  Letterbox.cs             # Scale/pad math
+  YOLOHelpers.cs           # Prediction extraction (v4, YOLO26 E2E, one-to-many, NMS)
+  WinMLHelpers.cs          # ExecutionProvider plumbing
+
+ViewModels/                # MVVM view models (CommunityToolkit.Mvvm)
+
+Sample.xaml(.cs)           # Main Scan page: detection, camera, AI analyze, extract
+MainWindow.xaml(.cs)       # NavigationView shell
+scripts/
+  download-models.ps1      # YOLO26 weight download automation
 ```
 
 ---
