@@ -154,7 +154,7 @@
                     <ScrollViewer
                         x:Name="ImagePanelScroller"
                         ZoomMode="Enabled"
-                        MinZoomFactor="1.0"
+                        MinZoomFactor="0.1"
                         MaxZoomFactor="5.0"
                         HorizontalScrollBarVisibility="Auto"
                         VerticalScrollBarVisibility="Auto"

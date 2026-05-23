@@ -191,7 +191,7 @@ public sealed partial class ReviewPage : Page
 
     private void ShowImagePanel()
     {
-        ImagePanelColumn.Width = new GridLength(350);
+        ImagePanelColumn.Width = new GridLength(1, GridUnitType.Star);
         ImagePanel.Visibility = Visibility.Visible;
         ImagePanelScroller.ChangeView(0, 0, 1.0f, disableAnimation: true);
     }
