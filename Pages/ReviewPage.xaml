@@ -11,101 +11,165 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- Header -->
-        <TextBlock
-            Grid.Row="0"
-            Text="Review Detected Books"
-            Style="{StaticResource TitleTextBlockStyle}"
-            Margin="0,0,0,8" />
+        <!-- Header with scan navigation -->
+        <Grid Grid.Row="0" Margin="0,0,0,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
 
-        <!-- Source image thumbnail -->
-        <Border
-            x:Name="SourceImageBorder"
+            <TextBlock
+                Grid.Column="0"
+                Text="Review Detected Books"
+                Style="{StaticResource TitleTextBlockStyle}" />
+
+            <!-- Scan set navigation -->
+            <StackPanel
+                Grid.Column="1"
+                Orientation="Horizontal"
+                Spacing="8"
+                x:Name="ScanNavPanel"
+                Visibility="Collapsed">
+                <Button
+                    x:Name="PrevScanButton"
+                    Click="PrevScanButton_Click"
+                    ToolTipService.ToolTip="Previous scan"
+                    Padding="6,4">
+                    <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE76B;" FontSize="14" />
+                </Button>
+                <TextBlock
+                    x:Name="ScanIndexLabel"
+                    VerticalAlignment="Center"
+                    Text="1 / 1"
+                    Opacity="0.7" />
+                <Button
+                    x:Name="NextScanButton"
+                    Click="NextScanButton_Click"
+                    ToolTipService.ToolTip="Next scan"
+                    Padding="6,4">
+                    <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE76C;" FontSize="14" />
+                </Button>
+            </StackPanel>
+        </Grid>
+
+        <TextBlock
             Grid.Row="1"
-            Width="120"
-            Height="80"
-            HorizontalAlignment="Left"
-            Margin="0,0,0,8"
-            Background="{ThemeResource SubtleFillColorSecondaryBrush}"
-            CornerRadius="4"
-            Visibility="Collapsed"
-            PointerPressed="SourceImage_Click"
-            ToolTipService.ToolTip="Click to view full image">
-            <Image x:Name="SourceThumbnail" Stretch="UniformToFill" />
-        </Border>
-
-        <TextBlock
-            Grid.Row="2"
             x:Name="ReviewStatus"
             Text="No scan results to review. Run a scan first from the Scan tab."
             Opacity="0.7"
-            Margin="0,0,0,16" />
+            Margin="0,0,0,12" />
 
-        <!-- Book list -->
-        <ListView
-            x:Name="ReviewList"
-            Grid.Row="3"
-            SelectionMode="None"
-            Visibility="Collapsed"
-            ContainerContentChanging="ReviewList_ContainerContentChanging">
-            <ListView.ItemTemplate>
-                <DataTemplate>
-                    <Grid Padding="8" ColumnSpacing="12">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="80" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
+        <!-- Main content: two-column layout -->
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition x:Name="ImagePanelColumn" Width="0" />
+            </Grid.ColumnDefinitions>
 
-                        <!-- Crop thumbnail (click to view) -->
-                        <Border
-                            Grid.Column="0"
-                            Background="{ThemeResource SubtleFillColorSecondaryBrush}"
-                            CornerRadius="4"
-                            Height="100"
-                            PointerPressed="CropThumbnail_PointerPressed"
-                            ToolTipService.ToolTip="Click to view spine crop">
-                            <Image x:Name="CropImage" Stretch="Uniform" />
-                        </Border>
+            <!-- Left: Book list (editable) -->
+            <ListView
+                x:Name="ReviewList"
+                Grid.Column="0"
+                SelectionMode="None"
+                Visibility="Collapsed"
+                ContainerContentChanging="ReviewList_ContainerContentChanging">
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Padding="8" ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="60" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
 
-                        <!-- Editable fields -->
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="8">
-                            <TextBlock
-                                Text="{Binding DisplayLabel}"
-                                FontSize="11"
-                                Opacity="0.5"
-                                FontFamily="Consolas" />
-                            <TextBox
-                                Header="Title"
-                                Text="{Binding EditedTitle, Mode=TwoWay}"
-                                PlaceholderText="Book title" />
-                            <TextBox
-                                Header="Author"
-                                Text="{Binding EditedAuthor, Mode=TwoWay}"
-                                PlaceholderText="Author (optional)" />
-                        </StackPanel>
+                            <!-- Crop thumbnail (click to view in right panel) -->
+                            <Border
+                                Grid.Column="0"
+                                Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                CornerRadius="4"
+                                Height="80"
+                                PointerPressed="CropThumbnail_PointerPressed"
+                                ToolTipService.ToolTip="Click to view spine crop">
+                                <Image x:Name="CropImage" Stretch="Uniform" />
+                            </Border>
 
-                        <!-- Accept/Reject toggle -->
-                        <ToggleSwitch
-                            Grid.Column="2"
-                            VerticalAlignment="Center"
-                            IsOn="{Binding IsAccepted, Mode=TwoWay}"
-                            OnContent="Accept"
-                            OffContent="Reject" />
-                    </Grid>
-                </DataTemplate>
-            </ListView.ItemTemplate>
-        </ListView>
+                            <!-- Editable fields -->
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="6">
+                                <TextBlock
+                                    Text="{Binding DisplayLabel}"
+                                    FontSize="11"
+                                    Opacity="0.5"
+                                    FontFamily="Consolas" />
+                                <TextBox
+                                    Header="Title"
+                                    Text="{Binding EditedTitle, Mode=TwoWay}"
+                                    PlaceholderText="Book title" />
+                                <TextBox
+                                    Header="Author"
+                                    Text="{Binding EditedAuthor, Mode=TwoWay}"
+                                    PlaceholderText="Author (optional)" />
+                            </StackPanel>
+
+                            <!-- Accept/Reject toggle -->
+                            <ToggleSwitch
+                                Grid.Column="2"
+                                VerticalAlignment="Center"
+                                IsOn="{Binding IsAccepted, Mode=TwoWay}"
+                                OnContent="Accept"
+                                OffContent="Reject" />
+                        </Grid>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+
+            <!-- Right: Floating image panel -->
+            <Grid
+                x:Name="ImagePanel"
+                Grid.Column="1"
+                Visibility="Collapsed"
+                Margin="12,0,0,0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <Button
+                    Grid.Row="0"
+                    Content="✕"
+                    HorizontalAlignment="Right"
+                    Click="CloseImagePanel_Click"
+                    Padding="8,4"
+                    Margin="0,0,0,8"
+                    ToolTipService.ToolTip="Close image" />
+
+                <Border
+                    Grid.Row="1"
+                    Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                    CornerRadius="8"
+                    Tapped="ImagePanel_Tapped">
+                    <ScrollViewer
+                        x:Name="ImagePanelScroller"
+                        ZoomMode="Enabled"
+                        MinZoomFactor="1.0"
+                        MaxZoomFactor="5.0"
+                        HorizontalScrollBarVisibility="Auto"
+                        VerticalScrollBarVisibility="Auto"
+                        HorizontalScrollMode="Auto"
+                        VerticalScrollMode="Auto">
+                        <Image
+                            x:Name="ImagePanelImage"
+                            Stretch="Uniform" />
+                    </ScrollViewer>
+                </Border>
+            </Grid>
+        </Grid>
 
         <!-- Actions -->
-        <Grid
-            Grid.Row="4"
-            Margin="0,16,0,0">
+        <Grid Grid.Row="3" Margin="0,16,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
@@ -134,6 +198,8 @@
                 Grid.Column="2"
                 Orientation="Horizontal"
                 Spacing="12">
+                <Button Content="Cancel Import" x:Name="CancelButton" Click="CancelButton_Click"
+                        Visibility="Collapsed" />
                 <Button Content="Accept All" x:Name="AcceptAllButton" Click="AcceptAllButton_Click" />
                 <Button Content="Reject All" x:Name="RejectAllButton" Click="RejectAllButton_Click" />
                 <Button
@@ -142,42 +208,6 @@
                     Click="SaveButton_Click"
                     Style="{StaticResource AccentButtonStyle}" />
             </StackPanel>
-        </Grid>
-
-        <!-- Fullscreen image overlay -->
-        <Grid
-            x:Name="ImageOverlay"
-            Grid.Row="0"
-            Grid.RowSpan="99"
-            Background="{ThemeResource SmokeFillColorDefaultBrush}"
-            Visibility="Collapsed"
-            Tapped="ImageOverlay_Tapped">
-            <ScrollViewer
-                x:Name="OverlayScroller"
-                ZoomMode="Enabled"
-                MinZoomFactor="1.0"
-                MaxZoomFactor="3.0"
-                HorizontalScrollBarVisibility="Auto"
-                VerticalScrollBarVisibility="Auto"
-                HorizontalScrollMode="Auto"
-                VerticalScrollMode="Auto"
-                DoubleTapped="OverlayScroller_DoubleTapped">
-                <Viewbox
-                    Stretch="Uniform"
-                    Width="{Binding ViewportWidth, ElementName=OverlayScroller}"
-                    Height="{Binding ViewportHeight, ElementName=OverlayScroller}">
-                    <Image x:Name="OverlayImage" />
-                </Viewbox>
-            </ScrollViewer>
-            <Button
-                Content="✕"
-                HorizontalAlignment="Right"
-                VerticalAlignment="Top"
-                Margin="16"
-                Click="CloseOverlay_Click"
-                FontSize="20"
-                Width="40"
-                Height="40" />
         </Grid>
     </Grid>
 </Page>

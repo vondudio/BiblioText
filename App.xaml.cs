@@ -31,6 +31,11 @@ public partial class App : Application
         AnalysisClient = new AzureOpenAiAnalysisClient(SettingsStore);
         WorkflowService = new ScanWorkflowService(TitleExtractor, AnalysisClient, LibraryRepository);
 
+        // Initialize semantic search
+        var searchService = new SemanticSearchService();
+        await searchService.InitializeAsync();
+        SemanticSearchService = searchService;
+
         Window = new MainWindow();
         Window.Activate();
     }
@@ -41,4 +46,5 @@ public partial class App : Application
     internal static IBookTitleExtractor? TitleExtractor { get; private set; }
     internal static AzureOpenAiAnalysisClient? AnalysisClient { get; private set; }
     internal static ScanWorkflowService? WorkflowService { get; private set; }
+    internal static SemanticSearchService? SemanticSearchService { get; private set; }
 }

@@ -36,7 +36,29 @@ public sealed partial class LibraryPage : Page
         var repo = App.LibraryRepository;
         if (repo == null) return;
 
-        var books = await repo.GetBooksAsync(_searchQuery, _selectedLocationId);
+        List<Book> books;
+
+        // Try semantic search if query is non-trivial and service is available
+        var searchService = App.SemanticSearchService;
+        if (!string.IsNullOrWhiteSpace(_searchQuery) && searchService != null && searchService.IsAvailable)
+        {
+            var bookIds = await searchService.SearchAsync(_searchQuery);
+            if (bookIds.Count > 0)
+            {
+                var allBooks = await repo.GetBooksAsync(locationId: _selectedLocationId);
+                var idSet = new HashSet<int>(bookIds);
+                books = allBooks.Where(b => idSet.Contains(b.Id)).ToList();
+            }
+            else
+            {
+                books = await repo.GetBooksAsync(_searchQuery, _selectedLocationId);
+            }
+        }
+        else
+        {
+            books = await repo.GetBooksAsync(_searchQuery, _selectedLocationId);
+        }
+
         var locations = await repo.GetLocationsAsync();
 
         _books.Clear();
@@ -270,6 +292,7 @@ internal sealed class BookDisplay
         Id = book.Id;
         Title = book.Title;
         Author = book.Author ?? "";
+        ShortDescription = book.ShortDescription ?? "";
         SpineImagePath = book.SpineImagePath;
         BookshelfImagePath = book.BookshelfImagePath;
         DetectionIndex = book.DetectionIndex;
@@ -286,6 +309,8 @@ internal sealed class BookDisplay
     public int Id { get; }
     public string Title { get; }
     public string Author { get; }
+    public string ShortDescription { get; }
+    public Visibility HasDescription => string.IsNullOrEmpty(ShortDescription) ? Visibility.Collapsed : Visibility.Visible;
     public string? SpineImagePath { get; }
     public string? BookshelfImagePath { get; }
     public int? DetectionIndex { get; }

@@ -52,6 +52,8 @@ public sealed class SqliteLibraryRepository : ILibraryRepository, IDisposable
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 title TEXT NOT NULL,
                 author TEXT,
+                short_description TEXT,
+                long_description TEXT,
                 scan_id INTEGER,
                 location_id INTEGER,
                 spine_image_path TEXT,
@@ -93,6 +95,18 @@ public sealed class SqliteLibraryRepository : ILibraryRepository, IDisposable
             alter.CommandText = "ALTER TABLE books ADD COLUMN detection_index INTEGER;";
             await alter.ExecuteNonQueryAsync();
         }
+        if (!columns.Contains("short_description"))
+        {
+            using var alter = _connection!.CreateCommand();
+            alter.CommandText = "ALTER TABLE books ADD COLUMN short_description TEXT;";
+            await alter.ExecuteNonQueryAsync();
+        }
+        if (!columns.Contains("long_description"))
+        {
+            using var alter = _connection!.CreateCommand();
+            alter.CommandText = "ALTER TABLE books ADD COLUMN long_description TEXT;";
+            await alter.ExecuteNonQueryAsync();
+        }
     }
 
     // Books
@@ -102,12 +116,14 @@ public sealed class SqliteLibraryRepository : ILibraryRepository, IDisposable
         EnsureConnected();
         using var cmd = _connection!.CreateCommand();
         cmd.CommandText = """
-            INSERT INTO books (title, author, scan_id, location_id, spine_image_path, bookshelf_image_path, detection_index, created_at, is_duplicate, notes)
-            VALUES (@title, @author, @scanId, @locationId, @spinePath, @bookshelfPath, @detectionIndex, @createdAt, @isDuplicate, @notes);
+            INSERT INTO books (title, author, short_description, long_description, scan_id, location_id, spine_image_path, bookshelf_image_path, detection_index, created_at, is_duplicate, notes)
+            VALUES (@title, @author, @shortDesc, @longDesc, @scanId, @locationId, @spinePath, @bookshelfPath, @detectionIndex, @createdAt, @isDuplicate, @notes);
             SELECT last_insert_rowid();
             """;
         cmd.Parameters.AddWithValue("@title", book.Title);
         cmd.Parameters.AddWithValue("@author", (object?)book.Author ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@shortDesc", (object?)book.ShortDescription ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@longDesc", (object?)book.LongDescription ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@scanId", (object?)book.ScanId ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@locationId", (object?)book.LocationId ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@spinePath", (object?)book.SpineImagePath ?? DBNull.Value);
@@ -127,14 +143,16 @@ public sealed class SqliteLibraryRepository : ILibraryRepository, IDisposable
         EnsureConnected();
         using var cmd = _connection!.CreateCommand();
         cmd.CommandText = """
-            UPDATE books SET title=@title, author=@author, location_id=@locationId,
-                spine_image_path=@spinePath, bookshelf_image_path=@bookshelfPath,
+            UPDATE books SET title=@title, author=@author, short_description=@shortDesc, long_description=@longDesc,
+                location_id=@locationId, spine_image_path=@spinePath, bookshelf_image_path=@bookshelfPath,
                 detection_index=@detectionIndex, modified_at=@modifiedAt, is_duplicate=@isDuplicate, notes=@notes
             WHERE id=@id;
             """;
         cmd.Parameters.AddWithValue("@id", book.Id);
         cmd.Parameters.AddWithValue("@title", book.Title);
         cmd.Parameters.AddWithValue("@author", (object?)book.Author ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@shortDesc", (object?)book.ShortDescription ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@longDesc", (object?)book.LongDescription ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@locationId", (object?)book.LocationId ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@spinePath", (object?)book.SpineImagePath ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@bookshelfPath", (object?)book.BookshelfImagePath ?? DBNull.Value);
@@ -161,7 +179,7 @@ public sealed class SqliteLibraryRepository : ILibraryRepository, IDisposable
         var where = new List<string>();
         if (!string.IsNullOrWhiteSpace(searchQuery))
         {
-            where.Add("(title LIKE @search OR author LIKE @search)");
+            where.Add("(title LIKE @search OR author LIKE @search OR short_description LIKE @search OR long_description LIKE @search)");
             cmd.Parameters.AddWithValue("@search", $"%{searchQuery}%");
         }
         if (locationId.HasValue)
@@ -302,6 +320,8 @@ public sealed class SqliteLibraryRepository : ILibraryRepository, IDisposable
             Id = reader.GetInt32(reader.GetOrdinal("id")),
             Title = reader.GetString(reader.GetOrdinal("title")),
             Author = reader.IsDBNull(reader.GetOrdinal("author")) ? null : reader.GetString(reader.GetOrdinal("author")),
+            ShortDescription = reader.IsDBNull(reader.GetOrdinal("short_description")) ? null : reader.GetString(reader.GetOrdinal("short_description")),
+            LongDescription = reader.IsDBNull(reader.GetOrdinal("long_description")) ? null : reader.GetString(reader.GetOrdinal("long_description")),
             ScanId = reader.IsDBNull(reader.GetOrdinal("scan_id")) ? null : reader.GetInt32(reader.GetOrdinal("scan_id")),
             LocationId = reader.IsDBNull(reader.GetOrdinal("location_id")) ? null : reader.GetInt32(reader.GetOrdinal("location_id")),
             SpineImagePath = reader.IsDBNull(reader.GetOrdinal("spine_image_path")) ? null : reader.GetString(reader.GetOrdinal("spine_image_path")),

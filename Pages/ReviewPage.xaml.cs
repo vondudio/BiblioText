@@ -9,7 +9,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using AIDevGallery.Sample.Models;
-using Windows.Storage.Streams;
+using AIDevGallery.Sample.Services;
 
 namespace AIDevGallery.Sample.Pages;
 
@@ -17,7 +17,8 @@ public sealed partial class ReviewPage : Page
 {
     private readonly ObservableCollection<ReviewCandidate> _candidates = new();
     private readonly ObservableCollection<Location> _locations = new();
-    private string? _sourceImagePath;
+    private readonly List<ScanResultSet> _scanQueue = new();
+    private int _currentScanIndex = -1;
 
     public ReviewPage()
     {
@@ -47,84 +48,169 @@ public sealed partial class ReviewPage : Page
     }
 
     /// <summary>
-    /// Called externally (e.g., from ScanWorkflowService) to populate review candidates.
+    /// Called externally to add a new scan result set to the review queue.
     /// </summary>
     public void SetCandidates(IEnumerable<ReviewCandidate> candidates, string? sourceImagePath = null)
     {
-        _sourceImagePath = sourceImagePath;
-        _candidates.Clear();
-        foreach (var c in candidates)
+        var set = new ScanResultSet
         {
-            _candidates.Add(c);
+            Candidates = candidates.ToList(),
+            SourceImagePath = sourceImagePath,
+            Label = $"Scan {_scanQueue.Count + 1}"
+        };
+        _scanQueue.Add(set);
+
+        // If this is the first/only set, display it
+        if (_scanQueue.Count == 1)
+        {
+            _currentScanIndex = 0;
+        }
+        else if (_currentScanIndex < 0)
+        {
+            _currentScanIndex = _scanQueue.Count - 1;
         }
 
-        SourceThumbnail.Source = null;
-        OverlayImage.Source = null;
-        SourceImageBorder.Visibility = Visibility.Collapsed;
-        ImageOverlay.Visibility = Visibility.Collapsed;
-        OverlayScroller.ChangeView(0, 0, 1.0f, disableAnimation: true);
+        DisplayCurrentScanSet();
+        UpdateScanNavigation();
+    }
 
-        if (!string.IsNullOrWhiteSpace(_sourceImagePath) && File.Exists(_sourceImagePath))
+    private void DisplayCurrentScanSet()
+    {
+        _candidates.Clear();
+        CloseImagePanel();
+
+        if (_currentScanIndex < 0 || _currentScanIndex >= _scanQueue.Count)
         {
-            var imageUri = new Uri(_sourceImagePath);
-            var thumbnailBitmap = new BitmapImage(imageUri);
-            var overlayBitmap = new BitmapImage(imageUri);
-            SourceThumbnail.Source = thumbnailBitmap;
-            OverlayImage.Source = overlayBitmap;
-            SourceImageBorder.Visibility = Visibility.Visible;
+            ReviewStatus.Text = "No scan results to review. Run a scan first from the Scan tab.";
+            ReviewList.Visibility = Visibility.Collapsed;
+            CancelButton.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        var set = _scanQueue[_currentScanIndex];
+        foreach (var c in set.Candidates)
+        {
+            _candidates.Add(c);
         }
 
         if (_candidates.Count > 0)
         {
             ReviewStatus.Text = $"{_candidates.Count} book(s) detected. Review and edit titles below.";
             ReviewList.Visibility = Visibility.Visible;
+            CancelButton.Visibility = Visibility.Visible;
         }
         else
         {
-            ReviewStatus.Text = "No scan results to review. Run a scan first from the Scan tab.";
+            ReviewStatus.Text = "No books in this scan set.";
             ReviewList.Visibility = Visibility.Collapsed;
+            CancelButton.Visibility = Visibility.Visible;
         }
     }
 
-    private void SourceImage_Click(object sender, PointerRoutedEventArgs e)
+    private void UpdateScanNavigation()
     {
-        if (SourceThumbnail.Source == null)
+        if (_scanQueue.Count > 1)
         {
-            return;
+            ScanNavPanel.Visibility = Visibility.Visible;
+            ScanIndexLabel.Text = $"{_currentScanIndex + 1} / {_scanQueue.Count}";
+            PrevScanButton.IsEnabled = _currentScanIndex > 0;
+            NextScanButton.IsEnabled = _currentScanIndex < _scanQueue.Count - 1;
         }
+        else
+        {
+            ScanNavPanel.Visibility = Visibility.Collapsed;
+        }
+    }
 
-        OverlayScroller.ChangeView(0, 0, 1.0f, disableAnimation: true);
-        OverlayImage.Source = SourceThumbnail.Source;
-        ImageOverlay.Visibility = Visibility.Visible;
+    private void PrevScanButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_currentScanIndex > 0)
+        {
+            _currentScanIndex--;
+            DisplayCurrentScanSet();
+            UpdateScanNavigation();
+        }
+    }
+
+    private void NextScanButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_currentScanIndex < _scanQueue.Count - 1)
+        {
+            _currentScanIndex++;
+            DisplayCurrentScanSet();
+            UpdateScanNavigation();
+        }
+    }
+
+    private void CancelButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_currentScanIndex >= 0 && _currentScanIndex < _scanQueue.Count)
+        {
+            _scanQueue.RemoveAt(_currentScanIndex);
+
+            if (_scanQueue.Count == 0)
+            {
+                _currentScanIndex = -1;
+            }
+            else if (_currentScanIndex >= _scanQueue.Count)
+            {
+                _currentScanIndex = _scanQueue.Count - 1;
+            }
+
+            DisplayCurrentScanSet();
+            UpdateScanNavigation();
+        }
     }
 
     private void CropThumbnail_PointerPressed(object sender, PointerRoutedEventArgs e)
     {
         if (sender is FrameworkElement fe && fe.DataContext is ReviewCandidate candidate && candidate.CropJpeg != null)
         {
-            var bitmapImage = new BitmapImage();
-            using var stream = new MemoryStream(candidate.CropJpeg);
-            bitmapImage.SetSource(stream.AsRandomAccessStream());
-            OverlayImage.Source = bitmapImage;
-            OverlayScroller.ChangeView(0, 0, 1.0f, disableAnimation: true);
-            ImageOverlay.Visibility = Visibility.Visible;
+            ShowImageInPanel(candidate.CropJpeg);
+        }
+        else if (_currentScanIndex >= 0 && _currentScanIndex < _scanQueue.Count)
+        {
+            // Show source image if no crop
+            var path = _scanQueue[_currentScanIndex].SourceImagePath;
+            if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
+            {
+                ImagePanelImage.Source = new BitmapImage(new Uri(path));
+                ShowImagePanel();
+            }
         }
     }
 
-    private void ImageOverlay_Tapped(object sender, TappedRoutedEventArgs e)
+    private void ShowImageInPanel(byte[] jpegData)
     {
-        // Close overlay when tapping the background (not the image/scrollviewer content)
-        ImageOverlay.Visibility = Visibility.Collapsed;
+        var bitmapImage = new BitmapImage();
+        using var stream = new MemoryStream(jpegData);
+        bitmapImage.SetSource(stream.AsRandomAccessStream());
+        ImagePanelImage.Source = bitmapImage;
+        ShowImagePanel();
     }
 
-    private void OverlayScroller_DoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
+    private void ShowImagePanel()
     {
-        OverlayScroller.ChangeView(0, 0, 1.0f);
+        ImagePanelColumn.Width = new GridLength(350);
+        ImagePanel.Visibility = Visibility.Visible;
+        ImagePanelScroller.ChangeView(0, 0, 1.0f, disableAnimation: true);
     }
 
-    private void CloseOverlay_Click(object sender, RoutedEventArgs e)
+    private void CloseImagePanel()
     {
-        ImageOverlay.Visibility = Visibility.Collapsed;
+        ImagePanel.Visibility = Visibility.Collapsed;
+        ImagePanelColumn.Width = new GridLength(0);
+        ImagePanelImage.Source = null;
+    }
+
+    private void CloseImagePanel_Click(object sender, RoutedEventArgs e)
+    {
+        CloseImagePanel();
+    }
+
+    private void ImagePanel_Tapped(object sender, TappedRoutedEventArgs e)
+    {
+        CloseImagePanel();
     }
 
     private void AcceptAllButton_Click(object sender, RoutedEventArgs e)
@@ -141,9 +227,8 @@ public sealed partial class ReviewPage : Page
 
         if (args.Item is ReviewCandidate candidate && candidate.CropJpeg is { Length: > 0 })
         {
-            // Find the Image control named "CropImage" in the template
             var grid = args.ItemContainer.ContentTemplateRoot as Grid;
-            var border = grid?.Children.OfType<Border>().FirstOrDefault();
+            var border = grid?.Children.OfType<Microsoft.UI.Xaml.Controls.Border>().FirstOrDefault();
             if (border?.Child is Image cropImage)
             {
                 var bitmapImage = new BitmapImage();
@@ -178,7 +263,6 @@ public sealed partial class ReviewPage : Page
             return;
         }
 
-        // Save accepted books to library via repository
         var repo = App.LibraryRepository;
         if (repo == null)
         {
@@ -193,10 +277,13 @@ public sealed partial class ReviewPage : Page
             return;
         }
 
-        // Get selected location
         int? locationId = (LocationDropdown.SelectedItem as Location)?.Id;
+        string? sourceImagePath = _currentScanIndex >= 0 && _currentScanIndex < _scanQueue.Count
+            ? _scanQueue[_currentScanIndex].SourceImagePath
+            : null;
 
         int saved = 0;
+        var savedBooks = new List<Book>();
         foreach (var candidate in accepted)
         {
             var book = new Book
@@ -205,7 +292,7 @@ public sealed partial class ReviewPage : Page
                 Author = string.IsNullOrWhiteSpace(candidate.EditedAuthor) ? candidate.DetectedAuthor : candidate.EditedAuthor,
                 LocationId = locationId,
                 DetectionIndex = candidate.Index > 0 ? candidate.Index : null,
-                BookshelfImagePath = _sourceImagePath,
+                BookshelfImagePath = sourceImagePath,
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -222,6 +309,7 @@ public sealed partial class ReviewPage : Page
             }
 
             await repo.AddBookAsync(book);
+            savedBooks.Add(book);
             saved++;
         }
 
@@ -231,11 +319,66 @@ public sealed partial class ReviewPage : Page
             _candidates.Remove(candidate);
         }
 
-        ReviewStatus.Text = $"Saved {saved} book(s) to library. {_candidates.Count} remaining.";
-        if (_candidates.Count == 0)
+        // Batch fetch descriptions from AI
+        await FetchAndStoreDescriptionsAsync(savedBooks, repo);
+
+        // Remove this scan set if all candidates are processed
+        if (_candidates.Count == 0 && _currentScanIndex >= 0 && _currentScanIndex < _scanQueue.Count)
         {
-            ReviewList.Visibility = Visibility.Collapsed;
-            ReviewStatus.Text = "All books saved! Go to the Library tab to view them.";
+            _scanQueue.RemoveAt(_currentScanIndex);
+            if (_scanQueue.Count == 0)
+            {
+                _currentScanIndex = -1;
+                ReviewStatus.Text = "All books saved! Go to the Library tab to view them.";
+                ReviewList.Visibility = Visibility.Collapsed;
+                CancelButton.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                if (_currentScanIndex >= _scanQueue.Count)
+                    _currentScanIndex = _scanQueue.Count - 1;
+                DisplayCurrentScanSet();
+            }
+            UpdateScanNavigation();
+        }
+        else
+        {
+            ReviewStatus.Text = $"Saved {saved} book(s) to library. {_candidates.Count} remaining.";
+        }
+    }
+
+    private async Task FetchAndStoreDescriptionsAsync(List<Book> books, Persistence.ILibraryRepository repo)
+    {
+        try
+        {
+            var settingsStore = App.SettingsStore;
+            if (settingsStore == null) return;
+
+            var descService = new BookDescriptionService(settingsStore);
+            var bookList = books.Select(b => (b.Id, b.Title, b.Author)).ToList();
+            var descriptions = await descService.GetDescriptionsAsync(bookList);
+
+            foreach (var desc in descriptions)
+            {
+                var book = books.FirstOrDefault(b => b.Id == desc.BookId);
+                if (book != null)
+                {
+                    book.ShortDescription = desc.ShortDescription;
+                    book.LongDescription = desc.LongDescription;
+                    await repo.UpdateBookAsync(book);
+
+                    // Index for semantic search
+                    var searchService = App.SemanticSearchService;
+                    if (searchService != null)
+                    {
+                        await searchService.IndexBookAsync(book.Id, book.Title, book.Author, book.LongDescription);
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // Non-critical: descriptions are a nice-to-have
         }
     }
 
@@ -260,7 +403,6 @@ public sealed partial class ReviewPage : Page
                 var newLoc = new Location { Name = input.Text.Trim(), CreatedAt = DateTime.UtcNow };
                 await repo.AddLocationAsync(newLoc);
                 await LoadLocationsAsync();
-                // Auto-select the new location
                 LocationDropdown.SelectedItem = _locations.FirstOrDefault(l => l.Id == newLoc.Id);
             }
         }

@@ -98,6 +98,8 @@
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
                             <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
                             <TextBlock Text="{Binding Author}" Opacity="0.7" FontSize="13" />
+                            <TextBlock Text="{Binding ShortDescription}" Opacity="0.5" FontSize="12"
+                                       TextTrimming="CharacterEllipsis" MaxLines="1" />
                         </StackPanel>
 
                         <TextBlock Grid.Column="2" Text="{Binding LocationName}" VerticalAlignment="Center" Opacity="0.6" />
