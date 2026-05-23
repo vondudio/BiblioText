@@ -27,11 +27,21 @@ public sealed partial class ReviewPage : Page
         ReviewList.ItemsSource = _candidates;
         LocationDropdown.ItemsSource = _locations;
         this.Loaded += ReviewPage_Loaded;
+        this.Unloaded += ReviewPage_Unloaded;
     }
 
     private async void ReviewPage_Loaded(object sender, RoutedEventArgs e)
     {
         await LoadLocationsAsync();
+    }
+
+    private async void ReviewPage_Unloaded(object sender, RoutedEventArgs e)
+    {
+        if (_dictation != null)
+        {
+            await _dictation.CleanupAsync();
+            _dictation = null;
+        }
     }
 
     private async Task LoadLocationsAsync()
@@ -402,26 +412,55 @@ public sealed partial class ReviewPage : Page
         }
     }
 
-    private void VoiceTypeButton_Click(object sender, RoutedEventArgs e)
+    private DictationService? _dictation;
+    private TextBox? _activeTextBox;
+
+    private void ReviewTextBox_GotFocus(object sender, RoutedEventArgs e)
     {
-        // Trigger Windows Voice Typing (Win+H) — user should focus desired field first
-        LaunchVoiceTyping();
+        if (sender is TextBox tb)
+            _activeTextBox = tb;
     }
 
-    [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
-    private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
-
-    private static void LaunchVoiceTyping()
+    private async void VoiceTypeButton_Click(object sender, RoutedEventArgs e)
     {
-        const byte VK_LWIN = 0x5B;
-        const byte VK_H = 0x48;
-        const uint KEYEVENTF_KEYDOWN = 0x0000;
-        const uint KEYEVENTF_KEYUP = 0x0002;
+        if (_dictation == null)
+        {
+            _dictation = new DictationService();
+            _dictation.TextUpdated += text =>
+            {
+                if (_activeTextBox != null)
+                    _activeTextBox.Text = text;
+            };
+            _dictation.StatusChanged += msg =>
+            {
+                if (!string.IsNullOrEmpty(msg))
+                    ReviewStatusText.Text = msg;
+            };
+            _dictation.ListeningChanged += listening =>
+            {
+                ReviewStatusText.Text = listening ? "🎤 Dictating — speak now..." : "";
+            };
+            await _dictation.InitializeAsync(DispatcherQueue);
+        }
 
-        keybd_event(VK_LWIN, 0, KEYEVENTF_KEYDOWN, UIntPtr.Zero);
-        keybd_event(VK_H, 0, KEYEVENTF_KEYDOWN, UIntPtr.Zero);
-        keybd_event(VK_H, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
-        keybd_event(VK_LWIN, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+        if (_dictation.IsListening)
+        {
+            await _dictation.StopAsync();
+            ReviewStatusText.Text = "Dictation stopped.";
+        }
+        else
+        {
+            if (_activeTextBox == null)
+            {
+                ReviewStatusText.Text = "Click a text field first, then press Dictate.";
+                return;
+            }
+            // Start dictation, preserving any existing text in the field
+            string existing = _activeTextBox.Text ?? "";
+            if (!string.IsNullOrEmpty(existing) && !existing.EndsWith(" "))
+                existing += " ";
+            await _dictation.StartAsync(existing);
+        }
     }
 
     private async void AddLocationButton_Click(object sender, RoutedEventArgs e)

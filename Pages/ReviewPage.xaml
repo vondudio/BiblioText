@@ -108,21 +108,23 @@
                                 <TextBox
                                     Header="Title"
                                     Text="{Binding EditedTitle, Mode=TwoWay}"
-                                    PlaceholderText="Book title" />
+                                    PlaceholderText="Book title"
+                                    GotFocus="ReviewTextBox_GotFocus" />
                                 <TextBox
                                     Header="Author"
                                     Text="{Binding EditedAuthor, Mode=TwoWay}"
-                                    PlaceholderText="Author (optional)" />
+                                    PlaceholderText="Author (optional)"
+                                    GotFocus="ReviewTextBox_GotFocus" />
                                 <Button
                                     HorizontalAlignment="Left"
                                     Padding="6,3"
                                     Background="Transparent"
                                     BorderThickness="0"
                                     Click="VoiceTypeButton_Click"
-                                    ToolTipService.ToolTip="Start voice typing (Win+H) — click a text field first">
+                                    ToolTipService.ToolTip="Start/stop dictation into focused text field">
                                     <StackPanel Orientation="Horizontal" Spacing="4">
                                         <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE720;" FontSize="12" />
-                                        <TextBlock Text="Voice" FontSize="11" Opacity="0.7" />
+                                        <TextBlock Text="Dictate" FontSize="11" Opacity="0.7" />
                                     </StackPanel>
                                 </Button>
                             </StackPanel>

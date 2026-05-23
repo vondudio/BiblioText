@@ -249,8 +249,8 @@
                                 Visibility="Collapsed">
                                 <Image
                                     x:Name="SpineOverlayImage"
-                                    MaxWidth="160"
-                                    MaxHeight="300"
+                                    MaxWidth="280"
+                                    MaxHeight="500"
                                     Stretch="Uniform" />
                             </Border>
                         </Grid>
