@@ -283,6 +283,13 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
             return;
         }
 
+        // Skip auto-detection if checkbox is unchecked (user will use Refresh button)
+        if (!forceRerun && AutoDetectCheck.IsChecked != true)
+        {
+            ExtractButton.IsEnabled = false;
+            return;
+        }
+
         ExtractButton.IsEnabled = false;
         await DetectObjects(item);
     }
@@ -997,6 +1004,14 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
     }
 
     // ---------------- Model / confidence handlers ----------------
+
+    private async void RefreshDetectionButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_activeImage != null)
+        {
+            await ActivateImageAsync(_activeImage, forceRerun: true);
+        }
+    }
 
     private async void ModelPicker_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {

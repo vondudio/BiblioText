@@ -267,7 +267,8 @@ public sealed partial class LibraryPage : Page
 
     private void BookshelfOverlayContent_Tapped(object sender, TappedRoutedEventArgs e)
     {
-        e.Handled = true;
+        // Click anywhere (including on the image) closes the overlay
+        CloseBookshelfOverlay();
     }
 
     private void CloseBookshelfOverlay()

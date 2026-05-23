@@ -214,13 +214,9 @@
                     <ScrollViewer
                         x:Name="BookshelfOverlayScroller"
                         Grid.Row="1"
-                        ZoomMode="Enabled"
-                        MinZoomFactor="1.0"
-                        MaxZoomFactor="5.0"
-                        HorizontalScrollBarVisibility="Auto"
-                        VerticalScrollBarVisibility="Auto"
-                        HorizontalScrollMode="Auto"
-                        VerticalScrollMode="Auto">
+                        ZoomMode="Disabled"
+                        HorizontalScrollBarVisibility="Disabled"
+                        VerticalScrollBarVisibility="Disabled">
                         <Image
                             x:Name="BookshelfOverlayImage"
                             Stretch="Uniform" />

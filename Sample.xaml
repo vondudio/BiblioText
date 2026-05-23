@@ -118,6 +118,22 @@
                             </RepeatButton>
                         </StackPanel>
                     </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" Margin="8,0,0,0">
+                        <CheckBox
+                            x:Name="AutoDetectCheck"
+                            Content="Auto"
+                            IsChecked="True"
+                            ToolTipService.ToolTip="Automatically run detection when image loads"
+                            VerticalAlignment="Center" />
+                        <Button
+                            x:Name="RefreshDetectionButton"
+                            Click="RefreshDetectionButton_Click"
+                            ToolTipService.ToolTip="Re-run detection"
+                            Padding="6,4"
+                            VerticalAlignment="Center">
+                            <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE72C;" FontSize="14" />
+                        </Button>
+                    </StackPanel>
                 </StackPanel>
             </Grid>
             <Border
