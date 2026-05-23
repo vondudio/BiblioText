@@ -6,7 +6,7 @@ using System.Runtime.InteropServices;
 using Microsoft.UI.Xaml.Media;
 using Windows.ApplicationModel.DataTransfer;
 
-namespace AIDevGallery.Sample;
+namespace BiblioText;
 
 public sealed partial class MainWindow : Window
 {

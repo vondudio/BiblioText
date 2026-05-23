@@ -8,10 +8,10 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using AIDevGallery.Sample.Models;
-using AIDevGallery.Sample.Persistence;
+using BiblioText.Models;
+using BiblioText.Persistence;
 
-namespace AIDevGallery.Sample.Pages;
+namespace BiblioText.Pages;
 
 public sealed partial class LibraryPage : Page
 {

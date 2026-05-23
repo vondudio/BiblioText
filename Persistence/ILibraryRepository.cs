@@ -1,10 +1,10 @@
 #nullable enable
 
-using AIDevGallery.Sample.Models;
+using BiblioText.Models;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace AIDevGallery.Sample.Persistence;
+namespace BiblioText.Persistence;
 
 public interface ILibraryRepository
 {

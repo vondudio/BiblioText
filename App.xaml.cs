@@ -1,10 +1,10 @@
 using System;
 using Microsoft.UI.Xaml;
-using AIDevGallery.Sample.Settings;
-using AIDevGallery.Sample.Persistence;
-using AIDevGallery.Sample.Services;
+using BiblioText.Settings;
+using BiblioText.Persistence;
+using BiblioText.Services;
 
-namespace AIDevGallery.Sample;
+namespace BiblioText;
 
 /// <summary>
 /// Provides application-specific behavior to supplement the default Application class.

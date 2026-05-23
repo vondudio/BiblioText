@@ -1,8 +1,8 @@
-using AIDevGallery.Sample.Utils;
+using BiblioText.Utils;
 using Microsoft.UI.Xaml.Media.Imaging;
 using System.Collections.Generic;
 
-namespace AIDevGallery.Sample.Models;
+namespace BiblioText.Models;
 
 /// <summary>
 /// Cached result of one DetectObjects run, keyed in ImageItem.Outputs by

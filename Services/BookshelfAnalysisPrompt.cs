@@ -1,6 +1,6 @@
 #nullable enable
 
-namespace AIDevGallery.Sample.Services;
+namespace BiblioText.Services;
 
 /// <summary>
 /// Prompt templates for full-image bookshelf analysis via Azure OpenAI vision.

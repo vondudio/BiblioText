@@ -14,7 +14,7 @@ using Windows.Graphics.Imaging;
 using Windows.Media;
 using Windows.Storage.Streams;
 
-namespace AIDevGallery.Sample.Utils;
+namespace BiblioText.Utils;
 
 internal class BitmapFunctions
 {

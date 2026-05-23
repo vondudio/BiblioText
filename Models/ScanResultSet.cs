@@ -2,7 +2,7 @@
 
 using System.Collections.Generic;
 
-namespace AIDevGallery.Sample.Models;
+namespace BiblioText.Models;
 
 /// <summary>
 /// Represents a single scan result set containing detected book candidates and the source image.

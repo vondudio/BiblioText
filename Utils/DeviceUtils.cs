@@ -5,7 +5,7 @@ using System.Linq;
 using Windows.Win32.Foundation;
 using Windows.Win32.Graphics.Dxgi;
 
-namespace AIDevGallery.Sample.Utils;
+namespace BiblioText.Utils;
 
 internal static class DeviceUtils
 {

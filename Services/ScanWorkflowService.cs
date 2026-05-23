@@ -4,10 +4,10 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using AIDevGallery.Sample.Models;
-using AIDevGallery.Sample.Persistence;
+using BiblioText.Models;
+using BiblioText.Persistence;
 
-namespace AIDevGallery.Sample.Services;
+namespace BiblioText.Services;
 
 /// <summary>
 /// Orchestrates the scan workflow: takes detection results (from YOLO crops or full-image AI)

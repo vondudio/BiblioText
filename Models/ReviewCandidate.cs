@@ -2,7 +2,7 @@
 
 using CommunityToolkit.Mvvm.ComponentModel;
 
-namespace AIDevGallery.Sample.Models;
+namespace BiblioText.Models;
 
 public sealed partial class ReviewCandidate : ObservableObject
 {

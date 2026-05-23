@@ -5,7 +5,7 @@ using System.IO;
 using System.Security.Cryptography;
 using System.Text.Json;
 
-namespace AIDevGallery.Sample.Settings;
+namespace BiblioText.Settings;
 
 public sealed class DpapiSettingsStore : ISettingsStore
 {
@@ -19,7 +19,7 @@ public sealed class DpapiSettingsStore : ISettingsStore
     public DpapiSettingsStore()
         : this(Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "YOLO_Object_DetectionSample",
+            "BiblioText",
             "settings.dat"))
     {
     }

@@ -1,6 +1,6 @@
-using AIDevGallery.Sample.Utils;
+using BiblioText.Utils;
 
-namespace AIDevGallery.Sample.Services;
+namespace BiblioText.Services;
 
 /// <summary>
 /// One pre-processed image ready to send to a vision model API. The JPEG bytes

@@ -2,7 +2,7 @@
 
 using System;
 
-namespace AIDevGallery.Sample.Settings;
+namespace BiblioText.Settings;
 
 public sealed class EnvironmentSettingsStore : ISettingsStore
 {

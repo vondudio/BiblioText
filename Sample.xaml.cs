@@ -1,6 +1,6 @@
-using AIDevGallery.Sample.Models;
-using AIDevGallery.Sample.Services;
-using AIDevGallery.Sample.Utils;
+using BiblioText.Models;
+using BiblioText.Services;
+using BiblioText.Utils;
 using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
 using Microsoft.UI.Xaml;
@@ -25,7 +25,7 @@ using Windows.Storage;
 using Windows.Storage.Pickers;
 using Windows.Storage.Streams;
 
-namespace AIDevGallery.Sample;
+namespace BiblioText;
 
 internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
 {

@@ -2,7 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace AIDevGallery.Sample.Services;
+namespace BiblioText.Services;
 
 /// <summary>
 /// Placeholder <see cref="IBookTitleExtractor"/> used while the crop pre-processing

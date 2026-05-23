@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Windows.Search.AppContentIndex;
 
-namespace AIDevGallery.Sample.Services;
+namespace BiblioText.Services;
 
 /// <summary>
 /// Indexes book summaries using Windows AppContentIndex for semantic search.

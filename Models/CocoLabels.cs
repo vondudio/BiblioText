@@ -1,4 +1,4 @@
-namespace AIDevGallery.Sample.Models;
+namespace BiblioText.Models;
 
 internal static class CocoLabels
 {

@@ -1,4 +1,4 @@
-using AIDevGallery.Sample.Utils;
+using BiblioText.Utils;
 using Microsoft.UI.Xaml.Media.Imaging;
 using System;
 using System.Collections.Generic;
@@ -10,7 +10,7 @@ using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Windows.Storage.Streams;
 
-namespace AIDevGallery.Sample.Models;
+namespace BiblioText.Models;
 
 /// <summary>
 /// One loaded image in the bottom thumbnail strip. Holds the EXIF-normalized

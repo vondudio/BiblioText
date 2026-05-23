@@ -1,4 +1,4 @@
-namespace AIDevGallery.Sample.Utils;
+namespace BiblioText.Utils;
 
 internal enum HardwareAccelerator
 {

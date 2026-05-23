@@ -1,6 +1,6 @@
 #nullable enable
 
-namespace AIDevGallery.Sample.Settings;
+namespace BiblioText.Settings;
 
 public interface ISettingsStore
 {

@@ -5,7 +5,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 
-namespace AIDevGallery.Sample.Utils;
+namespace BiblioText.Utils;
 
 internal static class WinMLHelpers
 {

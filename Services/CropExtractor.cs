@@ -1,4 +1,4 @@
-using AIDevGallery.Sample.Utils;
+using BiblioText.Utils;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -7,7 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 
-namespace AIDevGallery.Sample.Services;
+namespace BiblioText.Services;
 
 internal sealed class CropExtractorOptions
 {

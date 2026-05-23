@@ -2,7 +2,7 @@
 
 using System;
 
-namespace AIDevGallery.Sample.Models;
+namespace BiblioText.Models;
 
 public sealed class Book
 {

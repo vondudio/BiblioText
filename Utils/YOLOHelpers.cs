@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace AIDevGallery.Sample.Utils;
+namespace BiblioText.Utils;
 
 internal static class YOLOHelpers
 {

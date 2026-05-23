@@ -106,7 +106,7 @@ else {
         throw "Python 3.11+ required on PATH for -UseUltralytics. Install via 'winget install Python.Python.3.12'."
     }
 
-    $venvPath = Join-Path $env:LOCALAPPDATA 'YOLO_Object_DetectionSample\venv'
+    $venvPath = Join-Path $env:LOCALAPPDATA 'BiblioText\venv'
     if (-not (Test-Path (Join-Path $venvPath 'Scripts\python.exe'))) {
         Write-Host "Creating virtualenv at $venvPath ..."
         & $python.Source -m venv $venvPath

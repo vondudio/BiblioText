@@ -1,4 +1,4 @@
-namespace AIDevGallery.Sample.Utils;
+namespace BiblioText.Utils;
 
 internal readonly record struct Letterbox(float Scale, int PadX, int PadY)
 {

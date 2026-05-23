@@ -1,9 +1,9 @@
-using AIDevGallery.Sample.Models;
+using BiblioText.Models;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Data;
 using System;
 
-namespace AIDevGallery.Sample;
+namespace BiblioText;
 
 /// <summary>
 /// Converts ImageItem.IsSelected to the Border.BorderThickness on the thumbnail

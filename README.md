@@ -36,15 +36,15 @@ The `Models\ModelInfo.cs` registry only lists models whose `.onnx` is actually p
 ## Build & run
 
 ### From Visual Studio
-1. Open `YOLO_Object_DetectionSample.sln`.
+1. Open `BiblioText.sln`.
 2. Solution Platform → **x64** (or **ARM64** on Snapdragon).
 3. Right-click the project → **Set as Startup Project** → **F5** (deploys as a packaged WinUI app).
 
 ### From the command line
 ```pwsh
-dotnet restore .\YOLO_Object_DetectionSample.csproj
-dotnet build   .\YOLO_Object_DetectionSample.csproj -c Debug   -p:Platform=ARM64
-dotnet build   .\YOLO_Object_DetectionSample.csproj -c Release -p:Platform=ARM64
+dotnet restore .\BiblioText.csproj
+dotnet build   .\BiblioText.csproj -c Debug   -p:Platform=ARM64
+dotnet build   .\BiblioText.csproj -c Release -p:Platform=ARM64
 ```
 Use `-p:Platform=x64` on Intel/AMD devices.
 
@@ -79,12 +79,12 @@ to trust the community mirror:
 .\scripts\download-models.ps1 -UseUltralytics -Sizes n,m
 ```
 Requires **Python 3.11+** on `PATH`. Creates an isolated venv at
-`%LOCALAPPDATA%\YOLO_Object_DetectionSample\venv`, installs `ultralytics`, then runs
+`%LOCALAPPDATA%\BiblioText\venv`, installs `ultralytics`, then runs
 `YOLO("yolo26{size}.pt").export(format="onnx", opset=17, simplify=True, end2end=...)`.
 On Windows arm64, PyTorch wheels are only available for `torch >= 2.7` on Python
 3.11/3.12/3.13. If pip's resolver complains, install torch from the CPU index first:
 ```pwsh
-& "$env:LOCALAPPDATA\YOLO_Object_DetectionSample\venv\Scripts\python.exe" -m pip `
+& "$env:LOCALAPPDATA\BiblioText\venv\Scripts\python.exe" -m pip `
     install torch --extra-index-url https://download.pytorch.org/whl/cpu
 ```
 then re-run the script.

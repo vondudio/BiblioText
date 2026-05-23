@@ -4,10 +4,10 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
-using AIDevGallery.Sample.Models;
+using BiblioText.Models;
 using Microsoft.Data.Sqlite;
 
-namespace AIDevGallery.Sample.Persistence;
+namespace BiblioText.Persistence;
 
 public sealed class SqliteLibraryRepository : ILibraryRepository, IDisposable
 {
@@ -18,7 +18,7 @@ public sealed class SqliteLibraryRepository : ILibraryRepository, IDisposable
     {
         var folder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "YOLO_Object_DetectionSample");
+            "BiblioText");
         Directory.CreateDirectory(folder);
         var dbPath = Path.Combine(folder, "library.db");
         _connectionString = $"Data Source={dbPath}";

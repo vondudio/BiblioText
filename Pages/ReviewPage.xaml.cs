@@ -8,10 +8,10 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using AIDevGallery.Sample.Models;
-using AIDevGallery.Sample.Services;
+using BiblioText.Models;
+using BiblioText.Services;
 
-namespace AIDevGallery.Sample.Pages;
+namespace BiblioText.Pages;
 
 public sealed partial class ReviewPage : Page
 {
@@ -301,7 +301,7 @@ public sealed partial class ReviewPage : Page
             {
                 var spinesFolder = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "YOLO_Object_DetectionSample", "spines");
+                    "BiblioText", "spines");
                 Directory.CreateDirectory(spinesFolder);
                 var spinePath = Path.Combine(spinesFolder, $"spine_{DateTime.UtcNow:yyyyMMdd_HHmmss}_{saved}.jpg");
                 await File.WriteAllBytesAsync(spinePath, candidate.CropJpeg);

@@ -1,4 +1,4 @@
-namespace AIDevGallery.Sample.Utils;
+namespace BiblioText.Utils;
 
 /// <summary>
 /// One YOLO26-seg detection. Carries the same Box/Label/Confidence as a

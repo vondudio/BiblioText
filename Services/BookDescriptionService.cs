@@ -7,9 +7,9 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using AIDevGallery.Sample.Settings;
+using BiblioText.Settings;
 
-namespace AIDevGallery.Sample.Services;
+namespace BiblioText.Services;
 
 /// <summary>
 /// Batch submits book titles and authors to Azure OpenAI to get short and long descriptions.

@@ -6,9 +6,9 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using AIDevGallery.Sample.Settings;
+using BiblioText.Settings;
 
-namespace AIDevGallery.Sample.Services;
+namespace BiblioText.Services;
 
 /// <summary>
 /// Real Azure OpenAI implementation of <see cref="IBookTitleExtractor"/>.

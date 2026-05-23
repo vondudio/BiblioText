@@ -2,9 +2,9 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using System;
 using System.Net.Http;
-using AIDevGallery.Sample.Settings;
+using BiblioText.Settings;
 
-namespace AIDevGallery.Sample.Pages;
+namespace BiblioText.Pages;
 
 public sealed partial class SettingsPage : Page
 {

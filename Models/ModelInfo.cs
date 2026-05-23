@@ -1,10 +1,10 @@
-using AIDevGallery.Sample.Utils;
+using BiblioText.Utils;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
-namespace AIDevGallery.Sample.Models;
+namespace BiblioText.Models;
 
 internal enum ModelHead
 {

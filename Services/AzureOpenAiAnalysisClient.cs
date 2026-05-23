@@ -7,9 +7,9 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using AIDevGallery.Sample.Settings;
+using BiblioText.Settings;
 
-namespace AIDevGallery.Sample.Services;
+namespace BiblioText.Services;
 
 /// <summary>
 /// Analyzes a full bookshelf image using Azure OpenAI vision to detect all visible book spines.
