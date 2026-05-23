@@ -462,6 +462,7 @@ internal sealed class BookDisplay
     public int? DetectionIndex { get; }
     public BitmapImage? SpineImage { get; }
     public string LocationName { get; }
+    public string LocationDisplay => string.IsNullOrEmpty(LocationName) ? "" : $"📍 {LocationName}";
     public string CreatedAtDisplay { get; }
     public string DetectionLabel => DetectionIndex.HasValue ? $"#{DetectionIndex}" : "";
 }
