@@ -180,20 +180,23 @@
                 <Border
                     Grid.Row="1"
                     Background="{ThemeResource SubtleFillColorSecondaryBrush}"
-                    CornerRadius="8"
-                    Tapped="ImagePanel_Tapped">
+                    CornerRadius="8">
                     <ScrollViewer
                         x:Name="ImagePanelScroller"
                         ZoomMode="Enabled"
-                        MinZoomFactor="0.1"
+                        MinZoomFactor="1.0"
                         MaxZoomFactor="5.0"
-                        HorizontalScrollBarVisibility="Auto"
-                        VerticalScrollBarVisibility="Auto"
-                        HorizontalScrollMode="Auto"
-                        VerticalScrollMode="Auto">
-                        <Image
-                            x:Name="ImagePanelImage"
-                            Stretch="Uniform" />
+                        HorizontalScrollBarVisibility="Hidden"
+                        VerticalScrollBarVisibility="Hidden"
+                        HorizontalScrollMode="Enabled"
+                        VerticalScrollMode="Enabled">
+                        <Viewbox Stretch="Uniform"
+                                 Width="{Binding ViewportWidth, ElementName=ImagePanelScroller}"
+                                 Height="{Binding ViewportHeight, ElementName=ImagePanelScroller}">
+                            <Image
+                                x:Name="ImagePanelImage"
+                                Stretch="Uniform" />
+                        </Viewbox>
                     </ScrollViewer>
                 </Border>
             </Grid>
