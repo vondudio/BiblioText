@@ -767,8 +767,26 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         string displayName = item.DisplayName;
         string? filePath = item.FilePath;
 
-        // Clear the screen immediately so user can load next scan
-        await RemoveActiveImageAsync();
+        // Remove from UI without disposing the bitmap (we still need it for cropping)
+        int index = _images.IndexOf(item);
+        if (index >= 0) _images.RemoveAt(index);
+        _activeImage = null;
+
+        if (_images.Count == 0)
+        {
+            DefaultImage.Source = null;
+            StatusText.Text = string.Empty;
+            StatusBar.Visibility = Visibility.Collapsed;
+            RemoveButton.IsEnabled = false;
+            ExtractButton.IsEnabled = false;
+            AiAnalyzeButton.IsEnabled = false;
+        }
+        else
+        {
+            int next = Math.Min(index, _images.Count - 1);
+            await ActivateImageAsync(_images[next]);
+        }
+
         ScanStatusText.Text = "Extracting titles (processing in background)...";
 
         try
@@ -847,6 +865,10 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         catch (Exception ex)
         {
             ScanStatusText.Text = $"Extraction failed: {ex.Message}";
+        }
+        finally
+        {
+            item.Dispose();
         }
     }
 
