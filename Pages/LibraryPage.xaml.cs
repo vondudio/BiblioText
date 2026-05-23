@@ -19,6 +19,7 @@ public sealed partial class LibraryPage : Page
     private readonly ObservableCollection<Location> _locations = new();
     private string _searchQuery = string.Empty;
     private int? _selectedLocationId;
+    private string? _sortOption;
 
     public LibraryPage()
     {
@@ -64,6 +65,9 @@ public sealed partial class LibraryPage : Page
 
         var locations = await repo.GetLocationsAsync();
 
+        // Apply sort
+        books = ApplySort(books);
+
         _books.Clear();
         foreach (var b in books)
         {
@@ -82,6 +86,20 @@ public sealed partial class LibraryPage : Page
         UpdateSelectionActions();
     }
 
+    private List<Book> ApplySort(List<Book> books)
+    {
+        return _sortOption switch
+        {
+            "Title A→Z" => books.OrderBy(b => b.Title, StringComparer.OrdinalIgnoreCase).ToList(),
+            "Title Z→A" => books.OrderByDescending(b => b.Title, StringComparer.OrdinalIgnoreCase).ToList(),
+            "Author A→Z" => books.OrderBy(b => b.Author ?? "", StringComparer.OrdinalIgnoreCase).ToList(),
+            "Author Z→A" => books.OrderByDescending(b => b.Author ?? "", StringComparer.OrdinalIgnoreCase).ToList(),
+            "Newest First" => books.OrderByDescending(b => b.CreatedAt).ToList(),
+            "Oldest First" => books.OrderBy(b => b.CreatedAt).ToList(),
+            _ => books
+        };
+    }
+
     private async void SearchBox_TextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)
     {
         if (args.Reason == AutoSuggestionBoxTextChangeReason.UserInput)
@@ -98,6 +116,12 @@ public sealed partial class LibraryPage : Page
             _selectedLocationId = loc.Id == 0 ? null : loc.Id;
             await RefreshAsync();
         }
+    }
+
+    private async void SortDropdown_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        _sortOption = SortDropdown.SelectedItem as string;
+        await RefreshAsync();
     }
 
     private void BookList_SelectionChanged(object sender, SelectionChangedEventArgs e)

@@ -27,6 +27,7 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="200" />
+                    <ColumnDefinition Width="160" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
@@ -43,7 +44,20 @@
                     PlaceholderText="All Locations"
                     SelectionChanged="LocationFilter_SelectionChanged" />
 
-                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
+                <ComboBox
+                    x:Name="SortDropdown"
+                    Grid.Column="2"
+                    PlaceholderText="Sort by..."
+                    SelectionChanged="SortDropdown_SelectionChanged">
+                    <x:String>Title A→Z</x:String>
+                    <x:String>Title Z→A</x:String>
+                    <x:String>Author A→Z</x:String>
+                    <x:String>Author Z→A</x:String>
+                    <x:String>Newest First</x:String>
+                    <x:String>Oldest First</x:String>
+                </ComboBox>
+
+                <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8">
                     <Button x:Name="AddLocationBtn" Click="AddLocationBtn_Click" ToolTipService.ToolTip="Manage locations">
                         <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE728;" FontSize="14" />
                     </Button>
