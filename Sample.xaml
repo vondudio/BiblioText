@@ -80,7 +80,7 @@
                             StepFrequency="0.05"
                             TickFrequency="0.1"
                             Width="240"
-                            Value="0.25"
+                            Value="0.15"
                             ValueChanged="ConfidenceSlider_ValueChanged" />
                         <TextBox
                             x:Name="ConfidenceText"

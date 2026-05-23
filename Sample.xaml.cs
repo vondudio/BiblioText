@@ -723,6 +723,31 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         await ActivateImageAsync(_images[next]);
     }
 
+    private async Task RemoveActiveImageAsync()
+    {
+        if (_activeImage == null) return;
+        var doomed = _activeImage;
+        int index = _images.IndexOf(doomed);
+        if (index < 0) return;
+        _images.RemoveAt(index);
+        doomed.Dispose();
+        _activeImage = null;
+
+        if (_images.Count == 0)
+        {
+            DefaultImage.Source = null;
+            StatusText.Text = string.Empty;
+            StatusBar.Visibility = Visibility.Collapsed;
+            RemoveButton.IsEnabled = false;
+            ExtractButton.IsEnabled = false;
+            AiAnalyzeButton.IsEnabled = false;
+            return;
+        }
+
+        int next = Math.Min(index, _images.Count - 1);
+        await ActivateImageAsync(_images[next]);
+    }
+
     private async void ExtractButton_Click(object sender, RoutedEventArgs e)
     {
         if (_activeImage == null || _currentModel == null)
@@ -853,6 +878,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
             if (App.Window is MainWindow mw)
             {
                 mw.NavigateToReview(candidates, _activeImage?.FilePath);
+                await RemoveActiveImageAsync();
             }
         }
         else if (result == ContentDialogResult.Secondary)
@@ -950,6 +976,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
                 if (App.Window is MainWindow mw)
                 {
                     mw.NavigateToReview(candidates, _activeImage?.FilePath);
+                    await RemoveActiveImageAsync();
                 }
             }
         }
