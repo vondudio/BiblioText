@@ -839,6 +839,12 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
                     detectedTitle = parts[0].Trim();
                     detectedAuthor = parts[1].Trim();
                 }
+                else if (title.Contains(','))
+                {
+                    var parts = title.Split(',', 2);
+                    detectedTitle = parts[0].Trim();
+                    detectedAuthor = parts[1].Trim();
+                }
 
                 candidates.Add(new Models.ReviewCandidate
                 {
