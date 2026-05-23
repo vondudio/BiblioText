@@ -404,17 +404,7 @@ public sealed partial class ReviewPage : Page
 
     private void VoiceTypeButton_Click(object sender, RoutedEventArgs e)
     {
-        // Focus the sibling TextBox and trigger Windows Voice Typing (Win+H)
-        if (sender is Button btn && btn.Parent is Grid grid)
-        {
-            var textBox = grid.Children.OfType<TextBox>().FirstOrDefault();
-            if (textBox != null)
-            {
-                textBox.Focus(FocusState.Programmatic);
-            }
-        }
-
-        // Simulate Win+H to invoke Windows Voice Typing
+        // Trigger Windows Voice Typing (Win+H) — user should focus desired field first
         LaunchVoiceTyping();
     }
 

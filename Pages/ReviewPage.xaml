@@ -105,48 +105,26 @@
                                     FontSize="11"
                                     Opacity="0.5"
                                     FontFamily="Consolas" />
-                                <Grid ColumnSpacing="4">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBox
-                                        Grid.Column="0"
-                                        Header="Title"
-                                        Text="{Binding EditedTitle, Mode=TwoWay}"
-                                        PlaceholderText="Book title" />
-                                    <Button
-                                        Grid.Column="1"
-                                        VerticalAlignment="Bottom"
-                                        Padding="6"
-                                        Background="Transparent"
-                                        BorderThickness="0"
-                                        Click="VoiceTypeButton_Click"
-                                        ToolTipService.ToolTip="Voice typing (Win+H)">
-                                        <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE720;" FontSize="14" />
-                                    </Button>
-                                </Grid>
-                                <Grid ColumnSpacing="4">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBox
-                                        Grid.Column="0"
-                                        Header="Author"
-                                        Text="{Binding EditedAuthor, Mode=TwoWay}"
-                                        PlaceholderText="Author (optional)" />
-                                    <Button
-                                        Grid.Column="1"
-                                        VerticalAlignment="Bottom"
-                                        Padding="6"
-                                        Background="Transparent"
-                                        BorderThickness="0"
-                                        Click="VoiceTypeButton_Click"
-                                        ToolTipService.ToolTip="Voice typing (Win+H)">
-                                        <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE720;" FontSize="14" />
-                                    </Button>
-                                </Grid>
+                                <TextBox
+                                    Header="Title"
+                                    Text="{Binding EditedTitle, Mode=TwoWay}"
+                                    PlaceholderText="Book title" />
+                                <TextBox
+                                    Header="Author"
+                                    Text="{Binding EditedAuthor, Mode=TwoWay}"
+                                    PlaceholderText="Author (optional)" />
+                                <Button
+                                    HorizontalAlignment="Left"
+                                    Padding="6,3"
+                                    Background="Transparent"
+                                    BorderThickness="0"
+                                    Click="VoiceTypeButton_Click"
+                                    ToolTipService.ToolTip="Start voice typing (Win+H) — click a text field first">
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE720;" FontSize="12" />
+                                        <TextBlock Text="Voice" FontSize="11" Opacity="0.7" />
+                                    </StackPanel>
+                                </Button>
                             </StackPanel>
 
                             <!-- Accept/Reject toggle -->
