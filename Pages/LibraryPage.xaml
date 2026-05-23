@@ -140,7 +140,7 @@
                                 FontSize="12"
                                 TextWrapping="WrapWholeWords"
                                 TextTrimming="CharacterEllipsis"
-                                MaxLines="2"
+                                MaxLines="4"
                                 Visibility="{Binding HasDescription}" />
 
                             <Button
