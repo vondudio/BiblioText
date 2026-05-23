@@ -168,7 +168,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         ModelPicker.SelectedItem = initial;
         _suppressModelChange = false;
 
-        ConfidenceSlider.Value = initial.DefaultConfidence;
+        ConfidenceSlider.Value = 0.20;
 
         try
         {
