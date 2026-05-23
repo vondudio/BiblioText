@@ -149,12 +149,18 @@ public sealed class BookDescription
 
 internal sealed class DescriptionResponse
 {
+    [System.Text.Json.Serialization.JsonPropertyName("descriptions")]
     public List<DescriptionItem>? Descriptions { get; set; }
 }
 
 internal sealed class DescriptionItem
 {
+    [System.Text.Json.Serialization.JsonPropertyName("index")]
     public int Index { get; set; }
+
+    [System.Text.Json.Serialization.JsonPropertyName("short_description")]
     public string? ShortDescription { get; set; }
+
+    [System.Text.Json.Serialization.JsonPropertyName("long_description")]
     public string? LongDescription { get; set; }
 }

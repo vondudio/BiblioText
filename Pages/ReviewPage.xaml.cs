@@ -354,9 +354,24 @@ public sealed partial class ReviewPage : Page
             var settingsStore = App.SettingsStore;
             if (settingsStore == null) return;
 
+            var settings = settingsStore.Load();
+            if (!settings.IsConfigured)
+            {
+                ReviewStatus.Text += " (Descriptions skipped: Azure OpenAI not configured)";
+                return;
+            }
+
+            ReviewStatus.Text += " Fetching descriptions...";
+
             var descService = new BookDescriptionService(settingsStore);
             var bookList = books.Select(b => (b.Id, b.Title, b.Author)).ToList();
             var descriptions = await descService.GetDescriptionsAsync(bookList);
+
+            if (descriptions.Count == 0)
+            {
+                ReviewStatus.Text += " (No descriptions returned from AI)";
+                return;
+            }
 
             foreach (var desc in descriptions)
             {
@@ -375,10 +390,12 @@ public sealed partial class ReviewPage : Page
                     }
                 }
             }
+
+            ReviewStatus.Text += $" ✓ {descriptions.Count} description(s) added.";
         }
-        catch
+        catch (Exception ex)
         {
-            // Non-critical: descriptions are a nice-to-have
+            ReviewStatus.Text += $" (Description error: {ex.Message})";
         }
     }
 
