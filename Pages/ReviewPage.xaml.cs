@@ -402,6 +402,38 @@ public sealed partial class ReviewPage : Page
         }
     }
 
+    private void VoiceTypeButton_Click(object sender, RoutedEventArgs e)
+    {
+        // Focus the sibling TextBox and trigger Windows Voice Typing (Win+H)
+        if (sender is Button btn && btn.Parent is Grid grid)
+        {
+            var textBox = grid.Children.OfType<TextBox>().FirstOrDefault();
+            if (textBox != null)
+            {
+                textBox.Focus(FocusState.Programmatic);
+            }
+        }
+
+        // Simulate Win+H to invoke Windows Voice Typing
+        LaunchVoiceTyping();
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+    private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+
+    private static void LaunchVoiceTyping()
+    {
+        const byte VK_LWIN = 0x5B;
+        const byte VK_H = 0x48;
+        const uint KEYEVENTF_KEYDOWN = 0x0000;
+        const uint KEYEVENTF_KEYUP = 0x0002;
+
+        keybd_event(VK_LWIN, 0, KEYEVENTF_KEYDOWN, UIntPtr.Zero);
+        keybd_event(VK_H, 0, KEYEVENTF_KEYDOWN, UIntPtr.Zero);
+        keybd_event(VK_H, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+        keybd_event(VK_LWIN, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+    }
+
     private async void AddLocationButton_Click(object sender, RoutedEventArgs e)
     {
         var input = new TextBox { PlaceholderText = "Location name (e.g., Living Room Shelf)" };

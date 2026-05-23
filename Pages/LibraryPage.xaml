@@ -238,16 +238,19 @@
                                 Stretch="Uniform" />
                             <Border
                                 x:Name="SpineOverlayBorder"
-                                HorizontalAlignment="Center"
-                                VerticalAlignment="Center"
-                                Background="#CC000000"
-                                Padding="8"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Bottom"
+                                Background="#DD000000"
+                                Padding="6"
+                                Margin="12"
                                 CornerRadius="8"
+                                BorderBrush="White"
+                                BorderThickness="2"
                                 Visibility="Collapsed">
                                 <Image
                                     x:Name="SpineOverlayImage"
-                                    MaxWidth="200"
-                                    MaxHeight="400"
+                                    MaxWidth="160"
+                                    MaxHeight="300"
                                     Stretch="Uniform" />
                             </Border>
                         </Grid>

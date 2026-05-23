@@ -105,14 +105,48 @@
                                     FontSize="11"
                                     Opacity="0.5"
                                     FontFamily="Consolas" />
-                                <TextBox
-                                    Header="Title"
-                                    Text="{Binding EditedTitle, Mode=TwoWay}"
-                                    PlaceholderText="Book title" />
-                                <TextBox
-                                    Header="Author"
-                                    Text="{Binding EditedAuthor, Mode=TwoWay}"
-                                    PlaceholderText="Author (optional)" />
+                                <Grid ColumnSpacing="4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox
+                                        Grid.Column="0"
+                                        Header="Title"
+                                        Text="{Binding EditedTitle, Mode=TwoWay}"
+                                        PlaceholderText="Book title" />
+                                    <Button
+                                        Grid.Column="1"
+                                        VerticalAlignment="Bottom"
+                                        Padding="6"
+                                        Background="Transparent"
+                                        BorderThickness="0"
+                                        Click="VoiceTypeButton_Click"
+                                        ToolTipService.ToolTip="Voice typing (Win+H)">
+                                        <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE720;" FontSize="14" />
+                                    </Button>
+                                </Grid>
+                                <Grid ColumnSpacing="4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox
+                                        Grid.Column="0"
+                                        Header="Author"
+                                        Text="{Binding EditedAuthor, Mode=TwoWay}"
+                                        PlaceholderText="Author (optional)" />
+                                    <Button
+                                        Grid.Column="1"
+                                        VerticalAlignment="Bottom"
+                                        Padding="6"
+                                        Background="Transparent"
+                                        BorderThickness="0"
+                                        Click="VoiceTypeButton_Click"
+                                        ToolTipService.ToolTip="Voice typing (Win+H)">
+                                        <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE720;" FontSize="14" />
+                                    </Button>
+                                </Grid>
                             </StackPanel>
 
                             <!-- Accept/Reject toggle -->

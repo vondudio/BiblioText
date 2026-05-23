@@ -760,36 +760,39 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
             return;
         }
 
-        ExtractButton.IsEnabled = false;
-        Loader.IsActive = true;
-        Loader.Visibility = Visibility.Visible;
-        ScanStatusText.Text = "Extracting titles...";
+        // Capture what we need from the image before clearing the screen
+        var sourceBitmap = item.SourceBitmap;
+        var maskedPredictions = cached.MaskedPredictions;
+        var boxPredictions = cached.BoxPredictions;
+        string displayName = item.DisplayName;
+        string? filePath = item.FilePath;
+
+        // Clear the screen immediately so user can load next scan
+        await RemoveActiveImageAsync();
+        ScanStatusText.Text = "Extracting titles (processing in background)...";
 
         try
         {
             var opts = new CropExtractorOptions
             {
-                ApplyMaskAlpha = cached.MaskedPredictions != null,
+                ApplyMaskAlpha = maskedPredictions != null,
                 PaddingPx = 8,
                 MaxLongEdgePx = 1024,
                 JpegQuality = 85,
                 FillColor = Color.White,
             };
 
-            // Crop on a background thread (GDI+ encode is CPU-bound).
             var crops = await Task.Run(() => CropExtractor.Extract(
-                item.SourceBitmap, cached.MaskedPredictions, cached.BoxPredictions, opts));
+                sourceBitmap, maskedPredictions, boxPredictions, opts));
 
-            // Save JPEGs to %TEMP%\YOLO_Crops\<image-stem>\ for human inspection -
-            // useful while pre-processing is being tuned.
-            string stem = SanitizeForPath(item.DisplayName);
+            string stem = SanitizeForPath(displayName);
             string folder = Path.Combine(
                 Path.GetTempPath(),
                 "YOLO_Crops",
                 stem + "_" + DateTime.Now.ToString("HHmmss"));
             await Task.Run(() => CropExtractor.SaveAll(crops, folder));
 
-            // Pipe each crop through the stub extractor.
+            // Pipe each crop through the title extractor
             var extracted = new List<(BookCrop Crop, string Title)>(crops.Count);
             for (int ci = 0; ci < crops.Count; ci++)
             {
@@ -799,57 +802,51 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
                 extracted.Add((c, title));
             }
 
-            await ShowResultsDialog(item, extracted, folder);
+            // Build candidates and send to review
+            var candidates = new List<Models.ReviewCandidate>();
+            for (int i = 0; i < extracted.Count; i++)
+            {
+                var (crop, title) = extracted[i];
+                string detectedTitle = title;
+                string detectedAuthor = "";
+                if (title.Contains(" - "))
+                {
+                    var parts = title.Split(" - ", 2);
+                    detectedTitle = parts[0].Trim();
+                    detectedAuthor = parts[1].Trim();
+                }
+                else if (title.Contains(" by "))
+                {
+                    var parts = title.Split(" by ", 2);
+                    detectedTitle = parts[0].Trim();
+                    detectedAuthor = parts[1].Trim();
+                }
+
+                candidates.Add(new Models.ReviewCandidate
+                {
+                    Index = i + 1,
+                    DetectedTitle = detectedTitle,
+                    DetectedAuthor = detectedAuthor,
+                    EditedTitle = detectedTitle,
+                    EditedAuthor = detectedAuthor,
+                    IsAccepted = true,
+                    CropJpeg = crop.Jpeg,
+                    PixelWidth = crop.PixelWidth,
+                    PixelHeight = crop.PixelHeight,
+                    Confidence = crop.Confidence
+                });
+            }
+            _latestReviewCandidates = candidates;
+
+            ScanStatusText.Text = $"Sent {candidates.Count} book(s) to Review.";
+            if (App.Window is MainWindow mw)
+            {
+                mw.NavigateToReview(candidates, filePath);
+            }
         }
         catch (Exception ex)
         {
-            App.Window?.ShowException(ex, "Failed to extract titles.");
-        }
-        finally
-        {
-            Loader.IsActive = false;
-            Loader.Visibility = Visibility.Collapsed;
-            ExtractButton.IsEnabled = cached.BoxPredictions.Count > 0;
-        }
-    }
-
-    private async Task ShowResultsDialog(ImageItem item, List<(BookCrop Crop, string Title)> results, string folder)
-    {
-        // Build ReviewCandidates from the extraction results
-        var candidates = new List<Models.ReviewCandidate>();
-        for (int i = 0; i < results.Count; i++)
-        {
-            var (crop, title) = results[i];
-            string detectedTitle = title;
-            string? detectedAuthor = null;
-            if (title.Contains(',') && !title.StartsWith("("))
-            {
-                var parts = title.Split(',', 2);
-                detectedTitle = parts[0].Trim();
-                detectedAuthor = parts.Length > 1 ? parts[1].Trim() : null;
-            }
-            candidates.Add(new Models.ReviewCandidate
-            {
-                Index = i + 1,
-                DetectedTitle = detectedTitle,
-                DetectedAuthor = detectedAuthor,
-                EditedTitle = detectedTitle,
-                EditedAuthor = detectedAuthor,
-                IsAccepted = true,
-                CropJpeg = crop.Jpeg,
-                PixelWidth = crop.PixelWidth,
-                PixelHeight = crop.PixelHeight,
-                Confidence = crop.Confidence
-            });
-        }
-        _latestReviewCandidates = candidates;
-
-        // Send directly to review and clear the image
-        ScanStatusText.Text = $"Sent {candidates.Count} book(s) to Review.";
-        if (App.Window is MainWindow mw)
-        {
-            mw.NavigateToReview(candidates, _activeImage?.FilePath);
-            await RemoveActiveImageAsync();
+            ScanStatusText.Text = $"Extraction failed: {ex.Message}";
         }
     }
 
@@ -871,72 +868,61 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
             return;
         }
 
-        AiAnalyzeButton.IsEnabled = false;
-        Loader.IsActive = true;
-        Loader.Visibility = Visibility.Visible;
+        // Capture image data before clearing the screen
+        byte[] imageJpeg;
+        List<BookCrop>? cropsList = null;
+        string filePath = _activeImage.FilePath ?? _activeImage.DisplayName;
+
+        if (_activeImage.Outputs.TryGetValue(CacheKey(), out var cached) && cached.BoxPredictions.Count > 0)
+        {
+            imageJpeg = BitmapFunctions.RenderAnnotatedJpeg(_activeImage.SourceBitmap, cached.BoxPredictions);
+            var opts = new CropExtractorOptions { PaddingPx = 4, MaxLongEdgePx = 512, JpegQuality = 80, FillColor = Color.White };
+            cropsList = await Task.Run(() => CropExtractor.Extract(
+                _activeImage.SourceBitmap, cached.MaskedPredictions, cached.BoxPredictions, opts));
+        }
+        else
+        {
+            using var ms = new MemoryStream();
+            _activeImage.SourceBitmap.Save(ms, System.Drawing.Imaging.ImageFormat.Jpeg);
+            imageJpeg = ms.ToArray();
+        }
+
+        // Clear screen immediately so user can load another scan
+        await RemoveActiveImageAsync();
         ScanStatusText.Text = "Running AI image analysis...";
 
         try
         {
-            // If we have detection results, send the annotated image with numbered boxes
-            // so the AI can reference detections by ID.
-            byte[] imageJpeg;
-            if (_activeImage.Outputs.TryGetValue(CacheKey(), out var cached) && cached.BoxPredictions.Count > 0)
-            {
-                imageJpeg = BitmapFunctions.RenderAnnotatedJpeg(_activeImage.SourceBitmap, cached.BoxPredictions);
-            }
-            else
-            {
-                using var ms = new MemoryStream();
-                _activeImage.SourceBitmap.Save(ms, System.Drawing.Imaging.ImageFormat.Jpeg);
-                imageJpeg = ms.ToArray();
-            }
-
-            var candidates = await workflow.AnalyzeFullImageAsync(
-                imageJpeg, _activeImage.FilePath ?? _activeImage.DisplayName);
+            var candidates = await workflow.AnalyzeFullImageAsync(imageJpeg, filePath);
 
             if (candidates.Count == 0)
             {
-                App.Window?.ShowException(null, "AI analysis returned no books. Try adjusting the image or check Settings.");
+                ScanStatusText.Text = "AI analysis returned no books.";
                 return;
             }
 
-            // Attach cropped bounding box images to each candidate if detections are available
-            if (_activeImage.Outputs.TryGetValue(CacheKey(), out var cachedForCrop) && cachedForCrop.BoxPredictions.Count > 0)
+            // Attach crop images if available
+            if (cropsList != null)
             {
-                var opts = new CropExtractorOptions { PaddingPx = 4, MaxLongEdgePx = 512, JpegQuality = 80, FillColor = Color.White };
-                var crops = await Task.Run(() => CropExtractor.Extract(
-                    _activeImage.SourceBitmap, cachedForCrop.MaskedPredictions, cachedForCrop.BoxPredictions, opts));
-
-                for (int i = 0; i < candidates.Count && i < crops.Count; i++)
+                for (int i = 0; i < candidates.Count && i < cropsList.Count; i++)
                 {
-                    candidates[i].CropJpeg = crops[i].Jpeg;
-                    candidates[i].PixelWidth = crops[i].PixelWidth;
-                    candidates[i].PixelHeight = crops[i].PixelHeight;
-                    candidates[i].Index = i + 1; // 1-based to match bounding box labels
+                    candidates[i].CropJpeg = cropsList[i].Jpeg;
+                    candidates[i].PixelWidth = cropsList[i].PixelWidth;
+                    candidates[i].PixelHeight = cropsList[i].PixelHeight;
+                    candidates[i].Index = i + 1;
                 }
             }
 
-            // Store candidates for the Review page to pick up
             _latestReviewCandidates = candidates;
-
-            // Send directly to review and clear the image
             ScanStatusText.Text = $"AI analysis complete — {candidates.Count} book(s) sent to Review.";
-            if (App.Window is MainWindow mw2)
+            if (App.Window is MainWindow mw)
             {
-                mw2.NavigateToReview(candidates, _activeImage?.FilePath);
-                await RemoveActiveImageAsync();
+                mw.NavigateToReview(candidates, filePath);
             }
         }
         catch (Exception ex)
         {
-            App.Window?.ShowException(ex, "Full-image AI analysis failed.");
-        }
-        finally
-        {
-            Loader.IsActive = false;
-            Loader.Visibility = Visibility.Collapsed;
-            AiAnalyzeButton.IsEnabled = _activeImage != null;
+            ScanStatusText.Text = $"AI analysis failed: {ex.Message}";
         }
     }
 
