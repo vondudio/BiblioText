@@ -299,7 +299,21 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         }
 
         ExtractButton.IsEnabled = false;
-        await DetectObjects(item);
+        try
+        {
+            await DetectObjects(item);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"DetectObjects failed: {ex}");
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                Loader.IsActive = false;
+                Loader.Visibility = Visibility.Collapsed;
+                StatusText.Text = $"Detection failed: {ex.Message}";
+                StatusBar.Visibility = Visibility.Visible;
+            });
+        }
     }
 
     private string CacheKey()
