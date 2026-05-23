@@ -7,142 +7,226 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
 
-    <Grid Padding="24">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
+    <Grid>
+        <Grid Padding="24">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
 
-        <!-- Header -->
-        <TextBlock
-            Grid.Row="0"
-            Text="My Library"
-            Style="{StaticResource TitleTextBlockStyle}"
-            Margin="0,0,0,16" />
+            <!-- Header -->
+            <TextBlock
+                Grid.Row="0"
+                Text="My Library"
+                Style="{StaticResource TitleTextBlockStyle}"
+                Margin="0,0,0,16" />
 
-        <!-- Search and filter bar -->
-        <Grid Grid.Row="1" Margin="0,0,0,12" ColumnSpacing="12">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="200" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
+            <!-- Search and filter bar -->
+            <Grid Grid.Row="1" Margin="0,0,0,12" ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="200" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
 
-            <AutoSuggestBox
-                x:Name="SearchBox"
-                Grid.Column="0"
-                PlaceholderText="Search books..."
-                QueryIcon="Find"
-                TextChanged="SearchBox_TextChanged" />
+                <AutoSuggestBox
+                    x:Name="SearchBox"
+                    Grid.Column="0"
+                    PlaceholderText="Search books..."
+                    QueryIcon="Find"
+                    TextChanged="SearchBox_TextChanged" />
 
-            <ComboBox
-                x:Name="LocationFilter"
-                Grid.Column="1"
-                PlaceholderText="All Locations"
-                SelectionChanged="LocationFilter_SelectionChanged" />
+                <ComboBox
+                    x:Name="LocationFilter"
+                    Grid.Column="1"
+                    PlaceholderText="All Locations"
+                    SelectionChanged="LocationFilter_SelectionChanged" />
 
-            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
-                <Button x:Name="AddLocationBtn" Click="AddLocationBtn_Click" ToolTipService.ToolTip="Manage locations">
-                    <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE728;" FontSize="14" />
-                </Button>
-                <Button x:Name="DeleteBookBtn" Click="DeleteBookBtn_Click" ToolTipService.ToolTip="Delete selected book" IsEnabled="False">
-                    <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE74D;" FontSize="14" />
-                </Button>
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
+                    <Button x:Name="AddLocationBtn" Click="AddLocationBtn_Click" ToolTipService.ToolTip="Manage locations">
+                        <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE728;" FontSize="14" />
+                    </Button>
+                    <Button x:Name="ChangeLocationBtn" Click="ChangeLocationBtn_Click" Content="Change Location" IsEnabled="False" />
+                    <Button x:Name="DeleteBookBtn" Click="DeleteBookBtn_Click" ToolTipService.ToolTip="Delete selected books" IsEnabled="False">
+                        <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE74D;" FontSize="14" />
+                    </Button>
+                </StackPanel>
+            </Grid>
+
+            <!-- Book list -->
+            <ListView
+                x:Name="BookList"
+                Grid.Row="2"
+                SelectionChanged="BookList_SelectionChanged"
+                SelectionMode="Multiple">
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Padding="8,12" ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="56" />
+                                <ColumnDefinition Width="2*" />
+                                <ColumnDefinition Width="3*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="160" />
+                                <ColumnDefinition Width="100" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <Button
+                                Grid.Column="0"
+                                Width="48"
+                                Height="64"
+                                Padding="0"
+                                HorizontalAlignment="Left"
+                                VerticalAlignment="Center"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                Click="SpineImage_Click"
+                                IsEnabled="{Binding HasBookshelfImage}"
+                                ToolTipService.ToolTip="View bookshelf scan">
+                                <Border
+                                    Width="48"
+                                    Height="64"
+                                    CornerRadius="4"
+                                    Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                                    <Grid>
+                                        <FontIcon
+                                            HorizontalAlignment="Center"
+                                            VerticalAlignment="Center"
+                                            FontFamily="Segoe MDL2 Assets"
+                                            Glyph="&#xE736;"
+                                            FontSize="20"
+                                            Opacity="0.3" />
+                                        <Image Source="{Binding SpineImage}" Stretch="UniformToFill" />
+                                        <Border
+                                            HorizontalAlignment="Left"
+                                            VerticalAlignment="Top"
+                                            Background="{ThemeResource AccentFillColorDefaultBrush}"
+                                            CornerRadius="0,0,4,0"
+                                            Padding="3,1">
+                                            <TextBlock Text="{Binding DetectionLabel}" FontSize="9" Foreground="White" FontWeight="Bold" />
+                                        </Border>
+                                    </Grid>
+                                </Border>
+                            </Button>
+
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="WrapWholeWords" MaxLines="2" />
+                                <TextBlock Text="{Binding Author}" Opacity="0.7" FontSize="13" TextTrimming="CharacterEllipsis" MaxLines="1" />
+                            </StackPanel>
+
+                            <TextBlock
+                                Grid.Column="2"
+                                Text="{Binding ShortDescription}"
+                                VerticalAlignment="Center"
+                                Opacity="0.6"
+                                FontSize="12"
+                                TextWrapping="WrapWholeWords"
+                                TextTrimming="CharacterEllipsis"
+                                MaxLines="2"
+                                Visibility="{Binding HasDescription}" />
+
+                            <Button
+                                Grid.Column="3"
+                                Padding="6"
+                                VerticalAlignment="Center"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                Click="DescriptionButton_Click"
+                                ToolTipService.ToolTip="View full description">
+                                <TextBlock Text="ℹ" FontSize="14" />
+                            </Button>
+
+                            <TextBlock Grid.Column="4" Text="{Binding LocationName}" VerticalAlignment="Center" Opacity="0.6" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Grid.Column="5" Text="{Binding CreatedAtDisplay}" VerticalAlignment="Center" Opacity="0.5" FontSize="12" />
+
+                            <Button
+                                Grid.Column="6"
+                                Padding="8,4"
+                                VerticalAlignment="Center"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                Tag="{Binding}">
+                                <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE712;" FontSize="14" />
+                                <Button.Flyout>
+                                    <MenuFlyout>
+                                        <MenuFlyoutItem Text="Edit Title" Click="EditTitle_Click" Tag="{Binding}" />
+                                        <MenuFlyoutItem Text="Edit Author" Click="EditAuthor_Click" Tag="{Binding}" />
+                                        <MenuFlyoutItem Text="Change Location" Click="ChangeLocation_Click" Tag="{Binding}" />
+                                        <MenuFlyoutSeparator />
+                                        <MenuFlyoutItem Text="Delete" Click="DeleteFromMenu_Click" Tag="{Binding}">
+                                            <MenuFlyoutItem.Icon>
+                                                <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE74D;" />
+                                            </MenuFlyoutItem.Icon>
+                                        </MenuFlyoutItem>
+                                    </MenuFlyout>
+                                </Button.Flyout>
+                            </Button>
+                        </Grid>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+
+            <!-- Empty state -->
+            <StackPanel
+                x:Name="EmptyState"
+                Grid.Row="2"
+                VerticalAlignment="Center"
+                HorizontalAlignment="Center"
+                Spacing="8"
+                Visibility="Visible">
+                <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE736;" FontSize="48" Opacity="0.3" />
+                <TextBlock Text="No books in your library yet" Opacity="0.5" HorizontalAlignment="Center" />
+                <TextBlock Text="Scan a bookshelf and save detected books to get started." Opacity="0.4" FontSize="12" HorizontalAlignment="Center" />
             </StackPanel>
         </Grid>
 
-        <!-- Book list -->
-        <ListView
-            x:Name="BookList"
-            Grid.Row="2"
-            SelectionChanged="BookList_SelectionChanged"
-            SelectionMode="Single">
-            <ListView.ItemTemplate>
-                <DataTemplate>
-                    <Grid Padding="8,12" ColumnSpacing="12">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="48" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="160" />
-                            <ColumnDefinition Width="100" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
+        <Grid
+            x:Name="BookshelfOverlay"
+            Background="#99000000"
+            Visibility="Collapsed"
+            Tapped="BookshelfOverlay_Tapped">
+            <Border
+                Margin="48"
+                Padding="16"
+                MaxWidth="1200"
+                MaxHeight="800"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Stretch"
+                Background="{ThemeResource LayerFillColorDefaultBrush}"
+                CornerRadius="12"
+                Tapped="BookshelfOverlayContent_Tapped">
+                <Grid RowSpacing="12">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
 
-                        <Border
-                            Grid.Column="0"
-                            Width="48"
-                            Height="48"
-                            CornerRadius="4"
-                            Background="{ThemeResource SubtleFillColorSecondaryBrush}">
-                            <Grid>
-                                <FontIcon
-                                    HorizontalAlignment="Center"
-                                    VerticalAlignment="Center"
-                                    FontFamily="Segoe MDL2 Assets"
-                                    Glyph="&#xE736;"
-                                    FontSize="20"
-                                    Opacity="0.3" />
-                                <Image Source="{Binding SpineImage}" Stretch="UniformToFill" />
-                                <Border
-                                    HorizontalAlignment="Left"
-                                    VerticalAlignment="Top"
-                                    Background="{ThemeResource AccentFillColorDefaultBrush}"
-                                    CornerRadius="0,0,4,0"
-                                    Padding="3,1">
-                                    <TextBlock Text="{Binding DetectionLabel}" FontSize="9" Foreground="White" FontWeight="Bold" />
-                                </Border>
-                            </Grid>
-                        </Border>
+                    <Button
+                        Grid.Row="0"
+                        Content="✕"
+                        HorizontalAlignment="Right"
+                        Click="CloseBookshelfOverlay_Click"
+                        Padding="8,4"
+                        ToolTipService.ToolTip="Close image" />
 
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
-                            <TextBlock Text="{Binding Author}" Opacity="0.7" FontSize="13" />
-                            <TextBlock Text="{Binding ShortDescription}" Opacity="0.5" FontSize="12"
-                                       TextTrimming="CharacterEllipsis" MaxLines="1" />
-                        </StackPanel>
-
-                        <TextBlock Grid.Column="2" Text="{Binding LocationName}" VerticalAlignment="Center" Opacity="0.6" />
-                        <TextBlock Grid.Column="3" Text="{Binding CreatedAtDisplay}" VerticalAlignment="Center" Opacity="0.5" FontSize="12" />
-
-                        <Button
-                            Grid.Column="4"
-                            Padding="8,4"
-                            VerticalAlignment="Center"
-                            Background="Transparent"
-                            BorderThickness="0"
-                            Tag="{Binding}">
-                            <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE712;" FontSize="14" />
-                            <Button.Flyout>
-                                <MenuFlyout>
-                                    <MenuFlyoutItem Text="Edit Title" Click="EditTitle_Click" Tag="{Binding}" />
-                                    <MenuFlyoutItem Text="Edit Author" Click="EditAuthor_Click" Tag="{Binding}" />
-                                    <MenuFlyoutItem Text="Change Location" Click="ChangeLocation_Click" Tag="{Binding}" />
-                                    <MenuFlyoutSeparator />
-                                    <MenuFlyoutItem Text="Delete" Click="DeleteFromMenu_Click" Tag="{Binding}">
-                                        <MenuFlyoutItem.Icon>
-                                            <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE74D;" />
-                                        </MenuFlyoutItem.Icon>
-                                    </MenuFlyoutItem>
-                                </MenuFlyout>
-                            </Button.Flyout>
-                        </Button>
-                    </Grid>
-                </DataTemplate>
-            </ListView.ItemTemplate>
-        </ListView>
-
-        <!-- Empty state -->
-        <StackPanel
-            x:Name="EmptyState"
-            Grid.Row="2"
-            VerticalAlignment="Center"
-            HorizontalAlignment="Center"
-            Spacing="8"
-            Visibility="Visible">
-            <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE736;" FontSize="48" Opacity="0.3" />
-            <TextBlock Text="No books in your library yet" Opacity="0.5" HorizontalAlignment="Center" />
-            <TextBlock Text="Scan a bookshelf and save detected books to get started." Opacity="0.4" FontSize="12" HorizontalAlignment="Center" />
-        </StackPanel>
+                    <ScrollViewer
+                        x:Name="BookshelfOverlayScroller"
+                        Grid.Row="1"
+                        ZoomMode="Enabled"
+                        MinZoomFactor="1.0"
+                        MaxZoomFactor="5.0"
+                        HorizontalScrollBarVisibility="Auto"
+                        VerticalScrollBarVisibility="Auto"
+                        HorizontalScrollMode="Auto"
+                        VerticalScrollMode="Auto">
+                        <Image
+                            x:Name="BookshelfOverlayImage"
+                            Stretch="Uniform" />
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+        </Grid>
     </Grid>
 </Page>

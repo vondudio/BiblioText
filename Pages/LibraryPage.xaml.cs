@@ -1,8 +1,11 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media.Imaging;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using AIDevGallery.Sample.Models;
@@ -76,6 +79,7 @@ public sealed partial class LibraryPage : Page
 
         EmptyState.Visibility = _books.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         BookList.Visibility = _books.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        UpdateSelectionActions();
     }
 
     private async void SearchBox_TextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)
@@ -98,14 +102,23 @@ public sealed partial class LibraryPage : Page
 
     private void BookList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        DeleteBookBtn.IsEnabled = BookList.SelectedItem != null;
+        UpdateSelectionActions();
     }
 
     private async void DeleteBookBtn_Click(object sender, RoutedEventArgs e)
     {
-        if (BookList.SelectedItem is not BookDisplay selected) return;
+        var selectedBooks = GetSelectedBooks();
+        if (selectedBooks.Count == 0) return;
 
-        await DeleteBookAsync(selected);
+        await DeleteBooksAsync(selectedBooks);
+    }
+
+    private async void ChangeLocationBtn_Click(object sender, RoutedEventArgs e)
+    {
+        var selectedBooks = GetSelectedBooks();
+        if (selectedBooks.Count == 0) return;
+
+        await ChangeLocationForBooksAsync(selectedBooks);
     }
 
     private async void EditTitle_Click(object sender, RoutedEventArgs e)
@@ -172,44 +185,7 @@ public sealed partial class LibraryPage : Page
     {
         if (TryGetBook(sender, out var book) is false) return;
 
-        var repo = App.LibraryRepository;
-        if (repo == null) return;
-
-        var locations = await repo.GetLocationsAsync();
-        var combo = new ComboBox
-        {
-            ItemsSource = locations,
-            DisplayMemberPath = nameof(Location.Name),
-            PlaceholderText = "Select location",
-            Width = 300
-        };
-
-        var current = locations.FirstOrDefault(l => l.Name == book.LocationName);
-        if (current != null)
-        {
-            combo.SelectedItem = current;
-        }
-
-        var dialog = new ContentDialog
-        {
-            Title = "Change Location",
-            Content = combo,
-            PrimaryButtonText = "Save",
-            CloseButtonText = "Cancel",
-            XamlRoot = this.XamlRoot
-        };
-
-        if (await dialog.ShowAsync() != ContentDialogResult.Primary || combo.SelectedItem is not Location loc)
-        {
-            return;
-        }
-
-        var dbBook = await repo.GetBookByIdAsync(book.Id);
-        if (dbBook == null) return;
-
-        dbBook.LocationId = loc.Id;
-        await repo.UpdateBookAsync(dbBook);
-        await RefreshAsync();
+        await ChangeLocationForBooksAsync(new[] { book });
     }
 
     private async void DeleteFromMenu_Click(object sender, RoutedEventArgs e)
@@ -243,12 +219,69 @@ public sealed partial class LibraryPage : Page
         }
     }
 
+    private void SpineImage_Click(object sender, RoutedEventArgs e)
+    {
+        if (TryGetBook(sender, out var book) is false || string.IsNullOrWhiteSpace(book.BookshelfImagePath) || !File.Exists(book.BookshelfImagePath))
+        {
+            return;
+        }
+
+        BookshelfOverlayImage.Source = new BitmapImage(new Uri(book.BookshelfImagePath));
+        BookshelfOverlay.Visibility = Visibility.Visible;
+        BookshelfOverlayScroller.ChangeView(0, 0, 1.0f, disableAnimation: true);
+    }
+
+    private void DescriptionButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (TryGetBook(sender, out var book) is false || sender is not FrameworkElement target)
+        {
+            return;
+        }
+
+        var flyout = new Flyout
+        {
+            Content = new ScrollViewer
+            {
+                MaxWidth = 420,
+                MaxHeight = 320,
+                Content = new TextBlock
+                {
+                    Text = book.LongDescriptionDisplay,
+                    TextWrapping = TextWrapping.WrapWholeWords
+                }
+            }
+        };
+
+        flyout.ShowAt(target);
+    }
+
+    private void CloseBookshelfOverlay_Click(object sender, RoutedEventArgs e)
+    {
+        CloseBookshelfOverlay();
+    }
+
+    private void BookshelfOverlay_Tapped(object sender, TappedRoutedEventArgs e)
+    {
+        CloseBookshelfOverlay();
+    }
+
+    private void BookshelfOverlayContent_Tapped(object sender, TappedRoutedEventArgs e)
+    {
+        e.Handled = true;
+    }
+
+    private void CloseBookshelfOverlay()
+    {
+        BookshelfOverlay.Visibility = Visibility.Collapsed;
+        BookshelfOverlayImage.Source = null;
+    }
+
     private static bool TryGetBook(object sender, out BookDisplay book)
     {
         book = null!;
-        if (sender is MenuFlyoutItem item)
+        if (sender is FrameworkElement element)
         {
-            var resolvedBook = item.Tag as BookDisplay ?? item.DataContext as BookDisplay;
+            var resolvedBook = element.Tag as BookDisplay ?? element.DataContext as BookDisplay;
             if (resolvedBook != null)
             {
                 book = resolvedBook;
@@ -261,10 +294,34 @@ public sealed partial class LibraryPage : Page
 
     private async Task DeleteBookAsync(BookDisplay book)
     {
+        await DeleteBooksAsync(new[] { book });
+    }
+
+    private void UpdateSelectionActions()
+    {
+        var hasSelection = BookList.SelectedItems.Count > 0;
+        DeleteBookBtn.IsEnabled = hasSelection;
+        ChangeLocationBtn.IsEnabled = hasSelection;
+    }
+
+    private List<BookDisplay> GetSelectedBooks()
+    {
+        return BookList.SelectedItems.Cast<BookDisplay>().ToList();
+    }
+
+    private async Task DeleteBooksAsync(IReadOnlyList<BookDisplay> books)
+    {
+        if (books.Count == 0)
+        {
+            return;
+        }
+
         var dialog = new ContentDialog
         {
-            Title = "Delete Book",
-            Content = $"Are you sure you want to delete \"{book.Title}\"?",
+            Title = books.Count == 1 ? "Delete Book" : "Delete Books",
+            Content = books.Count == 1
+                ? $"Are you sure you want to delete \"{books[0].Title}\"?"
+                : $"Are you sure you want to delete {books.Count} selected books?",
             PrimaryButtonText = "Delete",
             CloseButtonText = "Cancel",
             XamlRoot = this.XamlRoot,
@@ -279,7 +336,68 @@ public sealed partial class LibraryPage : Page
         var repo = App.LibraryRepository;
         if (repo == null) return;
 
-        await repo.DeleteBookAsync(book.Id);
+        foreach (var book in books)
+        {
+            await repo.DeleteBookAsync(book.Id);
+        }
+
+        await RefreshAsync();
+    }
+
+    private async Task ChangeLocationForBooksAsync(IReadOnlyList<BookDisplay> books)
+    {
+        if (books.Count == 0)
+        {
+            return;
+        }
+
+        var repo = App.LibraryRepository;
+        if (repo == null) return;
+
+        var locations = await repo.GetLocationsAsync();
+        var combo = new ComboBox
+        {
+            ItemsSource = locations,
+            DisplayMemberPath = nameof(Location.Name),
+            PlaceholderText = "Select location",
+            Width = 300
+        };
+
+        if (books.Count == 1)
+        {
+            var current = locations.FirstOrDefault(l => l.Name == books[0].LocationName);
+            if (current != null)
+            {
+                combo.SelectedItem = current;
+            }
+        }
+
+        var dialog = new ContentDialog
+        {
+            Title = books.Count == 1 ? "Change Location" : $"Change Location for {books.Count} Books",
+            Content = combo,
+            PrimaryButtonText = "Save",
+            CloseButtonText = "Cancel",
+            XamlRoot = this.XamlRoot
+        };
+
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary || combo.SelectedItem is not Location loc)
+        {
+            return;
+        }
+
+        foreach (var book in books)
+        {
+            var dbBook = await repo.GetBookByIdAsync(book.Id);
+            if (dbBook == null)
+            {
+                continue;
+            }
+
+            dbBook.LocationId = loc.Id;
+            await repo.UpdateBookAsync(dbBook);
+        }
+
         await RefreshAsync();
     }
 }
@@ -293,16 +411,16 @@ internal sealed class BookDisplay
         Title = book.Title;
         Author = book.Author ?? "";
         ShortDescription = book.ShortDescription ?? "";
+        LongDescription = book.LongDescription ?? "";
         SpineImagePath = book.SpineImagePath;
         BookshelfImagePath = book.BookshelfImagePath;
         DetectionIndex = book.DetectionIndex;
         LocationName = locationName ?? "";
         CreatedAtDisplay = book.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd");
 
-        // Load spine image from file path
-        if (!string.IsNullOrEmpty(SpineImagePath) && System.IO.File.Exists(SpineImagePath))
+        if (!string.IsNullOrEmpty(SpineImagePath) && File.Exists(SpineImagePath))
         {
-            SpineImage = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(SpineImagePath));
+            SpineImage = new BitmapImage(new Uri(SpineImagePath));
         }
     }
 
@@ -310,11 +428,14 @@ internal sealed class BookDisplay
     public string Title { get; }
     public string Author { get; }
     public string ShortDescription { get; }
+    public string LongDescription { get; }
+    public string LongDescriptionDisplay => string.IsNullOrWhiteSpace(LongDescription) ? "No description available" : LongDescription;
     public Visibility HasDescription => string.IsNullOrEmpty(ShortDescription) ? Visibility.Collapsed : Visibility.Visible;
+    public bool HasBookshelfImage => !string.IsNullOrWhiteSpace(BookshelfImagePath) && File.Exists(BookshelfImagePath);
     public string? SpineImagePath { get; }
     public string? BookshelfImagePath { get; }
     public int? DetectionIndex { get; }
-    public Microsoft.UI.Xaml.Media.Imaging.BitmapImage? SpineImage { get; }
+    public BitmapImage? SpineImage { get; }
     public string LocationName { get; }
     public string CreatedAtDisplay { get; }
     public string DetectionLabel => DetectionIndex.HasValue ? $"#{DetectionIndex}" : "";
