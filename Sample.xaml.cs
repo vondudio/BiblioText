@@ -44,6 +44,10 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
     private string _assetsDir = string.Empty;
     private bool _suppressModelChange;
 
+    // Secondary model for clipping (bounding boxes) — loaded on first extract/AI call
+    private InferenceSession? _clipSession;
+    private ModelInfo? _clipModel;
+
     // The strip of loaded images and the one currently displayed in the main viewer.
     private readonly ObservableCollection<ImageItem> _images = new();
     private ImageItem? _activeImage;
@@ -74,6 +78,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         {
             _confidenceDebounce?.Stop();
             _inferenceSession?.Dispose();
+            _clipSession?.Dispose();
             foreach (var img in _images)
             {
                 img.Dispose();
@@ -151,6 +156,9 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
 
     protected override async void OnNavigatedTo(Microsoft.UI.Xaml.Navigation.NavigationEventArgs e)
     {
+        // Only initialize once — page is cached, don't reset on re-navigation
+        if (_currentModel != null) return;
+
         _modelsDir = Path.Join(Windows.ApplicationModel.Package.Current.InstalledLocation.Path, "Models");
         _assetsDir = Path.Join(Windows.ApplicationModel.Package.Current.InstalledLocation.Path, "Assets");
 
@@ -164,7 +172,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
 
         _suppressModelChange = true;
         ModelPicker.ItemsSource = available;
-        var initial = ModelRegistry.Default(_modelsDir) ?? available[0];
+        var initial = ModelRegistry.DefaultForViewing(_modelsDir) ?? available[0];
         ModelPicker.SelectedItem = initial;
         _suppressModelChange = false;
 
@@ -755,15 +763,29 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
             return;
         }
         var item = _activeImage;
-        if (!item.Outputs.TryGetValue(CacheKey(), out var cached) || cached.BoxPredictions.Count == 0)
+
+        // Use clip model (bounding boxes) for extraction, not the viewing model
+        ScanStatusText.Text = "Running clip model for extraction...";
+        var sourceBitmap = item.SourceBitmap;
+        float confidence = (float)ConfidenceSlider.Value;
+
+        List<Prediction> boxPredictions;
+        try
         {
+            boxPredictions = await GetClipPredictionsAsync(sourceBitmap, confidence);
+        }
+        catch (Exception ex)
+        {
+            ScanStatusText.Text = $"Clip model error: {ex.Message}";
             return;
         }
 
-        // Capture what we need from the image before clearing the screen
-        var sourceBitmap = item.SourceBitmap;
-        var maskedPredictions = cached.MaskedPredictions;
-        var boxPredictions = cached.BoxPredictions;
+        if (boxPredictions.Count == 0)
+        {
+            ScanStatusText.Text = "No objects detected by clip model at current confidence.";
+            return;
+        }
+
         string displayName = item.DisplayName;
         string? filePath = item.FilePath;
 
@@ -793,7 +815,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         {
             var opts = new CropExtractorOptions
             {
-                ApplyMaskAlpha = maskedPredictions != null,
+                ApplyMaskAlpha = false, // bounding box model — no masks
                 PaddingPx = 8,
                 MaxLongEdgePx = 1024,
                 JpegQuality = 85,
@@ -801,7 +823,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
             };
 
             var crops = await Task.Run(() => CropExtractor.Extract(
-                sourceBitmap, maskedPredictions, boxPredictions, opts));
+                sourceBitmap, null, boxPredictions, opts));
 
             string stem = SanitizeForPath(displayName);
             string folder = Path.Combine(
@@ -896,22 +918,36 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
             return;
         }
 
-        // Capture image data before clearing the screen
-        byte[] imageJpeg;
-        List<BookCrop>? cropsList = null;
+        // Use clip model (bounding boxes) for AI submission
+        ScanStatusText.Text = "Running clip model for AI analysis...";
+        var sourceBitmap = _activeImage.SourceBitmap;
+        float confidence = (float)ConfidenceSlider.Value;
         string filePath = _activeImage.FilePath ?? _activeImage.DisplayName;
 
-        if (_activeImage.Outputs.TryGetValue(CacheKey(), out var cached) && cached.BoxPredictions.Count > 0)
+        byte[] imageJpeg;
+        List<BookCrop>? cropsList = null;
+
+        List<Prediction> clipBoxes;
+        try
         {
-            imageJpeg = BitmapFunctions.RenderAnnotatedJpeg(_activeImage.SourceBitmap, cached.BoxPredictions);
+            clipBoxes = await GetClipPredictionsAsync(sourceBitmap, confidence);
+        }
+        catch
+        {
+            clipBoxes = [];
+        }
+
+        if (clipBoxes.Count > 0)
+        {
+            imageJpeg = BitmapFunctions.RenderAnnotatedJpeg(sourceBitmap, clipBoxes);
             var opts = new CropExtractorOptions { PaddingPx = 4, MaxLongEdgePx = 512, JpegQuality = 80, FillColor = Color.White };
             cropsList = await Task.Run(() => CropExtractor.Extract(
-                _activeImage.SourceBitmap, cached.MaskedPredictions, cached.BoxPredictions, opts));
+                sourceBitmap, null, clipBoxes, opts));
         }
         else
         {
             using var ms = new MemoryStream();
-            _activeImage.SourceBitmap.Save(ms, System.Drawing.Imaging.ImageFormat.Jpeg);
+            sourceBitmap.Save(ms, System.Drawing.Imaging.ImageFormat.Jpeg);
             imageJpeg = ms.ToArray();
         }
 
@@ -1020,10 +1056,9 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         try
         {
             await LoadModel(model);
-            ConfidenceSlider.Value = model.DefaultConfidence;
-            if (_activeImage != null)
+            if (_activeImage != null && AutoDetectCheck.IsChecked == true)
             {
-                await ActivateImageAsync(_activeImage);
+                await ActivateImageAsync(_activeImage, forceRerun: true);
             }
         }
         catch (Exception ex)
@@ -1396,5 +1431,64 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         });
 
         image.Dispose();
+    }
+
+    /// <summary>
+    /// Ensures the clipping model (yolo26m bounding boxes) is loaded.
+    /// Used by Extract and AI Analyze to get clean bounding box crops
+    /// regardless of which model is selected for viewing.
+    /// </summary>
+    private async Task EnsureClipModelAsync()
+    {
+        if (_clipSession != null) return;
+
+        _clipModel = ModelRegistry.DefaultForClipping(_modelsDir);
+        if (_clipModel == null) return;
+
+        string modelPath = _clipModel.GetFullPath(_modelsDir);
+        await Task.Run(async () =>
+        {
+            var catalog = Microsoft.Windows.AI.MachineLearning.ExecutionProviderCatalog.GetDefault();
+            try { await catalog.EnsureAndRegisterCertifiedAsync(); } catch { }
+            SessionOptions opts = new();
+            opts.RegisterOrtExtensions();
+            _clipSession = new InferenceSession(modelPath, opts);
+        });
+    }
+
+    /// <summary>
+    /// Runs the clip model on the given bitmap and returns bounding box predictions.
+    /// </summary>
+    private async Task<List<Prediction>> GetClipPredictionsAsync(Bitmap sourceBitmap, float confidence)
+    {
+        await EnsureClipModelAsync();
+        if (_clipSession == null || _clipModel == null) return [];
+
+        var model = _clipModel;
+        var session = _clipSession;
+        int originalWidth = sourceBitmap.Width;
+        int originalHeight = sourceBitmap.Height;
+
+        return await Task.Run(() =>
+        {
+            using var image = new Bitmap(sourceBitmap);
+            using var resized = BitmapFunctions.ResizeWithPadding(
+                image, model.InputWidth, model.InputHeight, out var letterbox);
+
+            string inputName = session.InputNames[0];
+            var tensor = BitmapFunctions.PreprocessBitmapForYolo26(resized);
+            var inputs = new List<NamedOnnxValue> { NamedOnnxValue.CreateFromTensor(inputName, tensor) };
+
+            using var results = session.Run(inputs);
+
+            return model.Head switch
+            {
+                ModelHead.Yolo26EndToEnd =>
+                    YOLOHelpers.ExtractYolo26EndToEnd(results[0].AsTensor<float>(), letterbox, model.Labels, confidence),
+                ModelHead.Yolo26OneToMany =>
+                    YOLOHelpers.ExtractYolo26OneToMany(results[0].AsTensor<float>(), letterbox, model.Labels, confidence),
+                _ => YOLOHelpers.ExtractYolo26EndToEnd(results[0].AsTensor<float>(), letterbox, model.Labels, confidence),
+            };
+        });
     }
 }
