@@ -37,11 +37,8 @@ public sealed partial class ReviewPage : Page
 
     private async void ReviewPage_Unloaded(object sender, RoutedEventArgs e)
     {
-        if (_dictation != null)
-        {
-            await _dictation.CleanupAsync();
-            _dictation = null;
-        }
+        _dictation?.Dispose();
+        _dictation = null;
     }
 
     private async Task LoadLocationsAsync()
@@ -413,53 +410,80 @@ public sealed partial class ReviewPage : Page
     }
 
     private DictationService? _dictation;
-    private TextBox? _activeTextBox;
+    private Button? _activeRecordButton;
 
-    private void ReviewTextBox_GotFocus(object sender, RoutedEventArgs e)
+    private async void MicButton_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is TextBox tb)
-            _activeTextBox = tb;
-    }
+        if (sender is not Button btn) return;
 
-    private async void VoiceTypeButton_Click(object sender, RoutedEventArgs e)
-    {
+        // Initialize service on first use
         if (_dictation == null)
         {
             _dictation = new DictationService();
-            _dictation.TextUpdated += text =>
+            _dictation.StatusChanged += msg => ReviewStatusText.Text = msg ?? "";
+            try
             {
-                if (_activeTextBox != null)
-                    _activeTextBox.Text = text;
-            };
-            _dictation.StatusChanged += msg =>
+                await _dictation.InitializeAsync(DispatcherQueue);
+            }
+            catch (Exception ex)
             {
-                if (!string.IsNullOrEmpty(msg))
-                    ReviewStatusText.Text = msg;
-            };
-            _dictation.ListeningChanged += listening =>
-            {
-                ReviewStatusText.Text = listening ? "🎤 Dictating — speak now..." : "";
-            };
-            await _dictation.InitializeAsync(DispatcherQueue);
-        }
-
-        if (_dictation.IsListening)
-        {
-            await _dictation.StopAsync();
-            ReviewStatusText.Text = "Dictation stopped.";
-        }
-        else
-        {
-            if (_activeTextBox == null)
-            {
-                ReviewStatusText.Text = "Click a text field first, then press Dictate.";
+                ReviewStatusText.Text = $"Speech model error: {ex.Message}";
+                _dictation = null;
                 return;
             }
-            // Start dictation, preserving any existing text in the field
-            string existing = _activeTextBox.Text ?? "";
-            if (!string.IsNullOrEmpty(existing) && !existing.EndsWith(" "))
-                existing += " ";
-            await _dictation.StartAsync(existing);
+        }
+
+        // If this button is already recording, stop and transcribe
+        if (_dictation.IsRecording && _activeRecordButton == btn)
+        {
+            string text = await _dictation.StopAndTranscribeAsync();
+            InsertTextIntoField(btn, text);
+            SetMicIcon(btn, false);
+            _activeRecordButton = null;
+            return;
+        }
+
+        // If another button was recording, stop it first
+        if (_dictation.IsRecording && _activeRecordButton != null)
+        {
+            string text = await _dictation.StopAndTranscribeAsync();
+            InsertTextIntoField(_activeRecordButton, text);
+            SetMicIcon(_activeRecordButton, false);
+        }
+
+        // Start recording for this button
+        _dictation.StartRecording();
+        SetMicIcon(btn, true);
+        _activeRecordButton = btn;
+    }
+
+    private void InsertTextIntoField(Button btn, string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return;
+
+        // Find the sibling TextBox in the same Grid
+        if (btn.Parent is Grid grid)
+        {
+            foreach (var child in grid.Children)
+            {
+                if (child is TextBox tb)
+                {
+                    string existing = tb.Text ?? "";
+                    if (!string.IsNullOrEmpty(existing) && !existing.EndsWith(" "))
+                        existing += " ";
+                    tb.Text = existing + text;
+                    break;
+                }
+            }
+        }
+    }
+
+    private static void SetMicIcon(Button btn, bool recording)
+    {
+        if (btn.Content is FontIcon icon)
+        {
+            // Stop icon vs mic icon
+            icon.Glyph = recording ? "\uE71A" : "\uE720";
         }
     }
 

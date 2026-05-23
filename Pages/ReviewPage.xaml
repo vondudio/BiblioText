@@ -105,28 +105,44 @@
                                     FontSize="11"
                                     Opacity="0.5"
                                     FontFamily="Consolas" />
-                                <TextBox
-                                    Header="Title"
-                                    Text="{Binding EditedTitle, Mode=TwoWay}"
-                                    PlaceholderText="Book title"
-                                    GotFocus="ReviewTextBox_GotFocus" />
-                                <TextBox
-                                    Header="Author"
-                                    Text="{Binding EditedAuthor, Mode=TwoWay}"
-                                    PlaceholderText="Author (optional)"
-                                    GotFocus="ReviewTextBox_GotFocus" />
-                                <Button
-                                    HorizontalAlignment="Left"
-                                    Padding="6,3"
-                                    Background="Transparent"
-                                    BorderThickness="0"
-                                    Click="VoiceTypeButton_Click"
-                                    ToolTipService.ToolTip="Start/stop dictation into focused text field">
-                                    <StackPanel Orientation="Horizontal" Spacing="4">
-                                        <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE720;" FontSize="12" />
-                                        <TextBlock Text="Dictate" FontSize="11" Opacity="0.7" />
-                                    </StackPanel>
-                                </Button>
+                                <Grid>
+                                    <TextBox
+                                        Header="Title"
+                                        Text="{Binding EditedTitle, Mode=TwoWay}"
+                                        PlaceholderText="Book title"
+                                        Padding="8,8,32,8" />
+                                    <Button
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Bottom"
+                                        Margin="0,0,4,4"
+                                        Padding="4"
+                                        Background="Transparent"
+                                        BorderThickness="0"
+                                        Click="MicButton_Click"
+                                        Tag="Title"
+                                        ToolTipService.ToolTip="Record voice (up to 10s)">
+                                        <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE720;" FontSize="14" />
+                                    </Button>
+                                </Grid>
+                                <Grid>
+                                    <TextBox
+                                        Header="Author"
+                                        Text="{Binding EditedAuthor, Mode=TwoWay}"
+                                        PlaceholderText="Author (optional)"
+                                        Padding="8,8,32,8" />
+                                    <Button
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Bottom"
+                                        Margin="0,0,4,4"
+                                        Padding="4"
+                                        Background="Transparent"
+                                        BorderThickness="0"
+                                        Click="MicButton_Click"
+                                        Tag="Author"
+                                        ToolTipService.ToolTip="Record voice (up to 10s)">
+                                        <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE720;" FontSize="14" />
+                                    </Button>
+                                </Grid>
                             </StackPanel>
 
                             <!-- Accept/Reject toggle -->
