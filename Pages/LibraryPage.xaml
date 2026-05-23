@@ -78,7 +78,7 @@
                     <DataTemplate>
                         <Grid Padding="8,12" ColumnSpacing="12">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="72" />
+                                <ColumnDefinition Width="92" />
                                 <ColumnDefinition Width="2*" />
                                 <ColumnDefinition Width="3*" />
                                 <ColumnDefinition Width="Auto" />
@@ -88,7 +88,7 @@
 
                             <Button
                                 Grid.Column="0"
-                                Width="64"
+                                Width="84"
                                 Height="84"
                                 Padding="0"
                                 HorizontalAlignment="Left"
@@ -99,7 +99,7 @@
                                 IsEnabled="{Binding HasBookshelfImage}"
                                 ToolTipService.ToolTip="View bookshelf scan">
                                 <Border
-                                    Width="64"
+                                    Width="84"
                                     Height="84"
                                     CornerRadius="4"
                                     Background="{ThemeResource SubtleFillColorSecondaryBrush}">
