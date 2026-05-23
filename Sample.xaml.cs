@@ -763,6 +763,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         ExtractButton.IsEnabled = false;
         Loader.IsActive = true;
         Loader.Visibility = Visibility.Visible;
+        ScanStatusText.Text = "Extracting titles...";
 
         try
         {
@@ -790,8 +791,10 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
 
             // Pipe each crop through the stub extractor.
             var extracted = new List<(BookCrop Crop, string Title)>(crops.Count);
-            foreach (var c in crops)
+            for (int ci = 0; ci < crops.Count; ci++)
             {
+                var c = crops[ci];
+                ScanStatusText.Text = $"Extracting title {ci + 1} of {crops.Count}...";
                 string title = await _titleExtractor.ExtractAsync(c);
                 extracted.Add((c, title));
             }
@@ -841,56 +844,12 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         }
         _latestReviewCandidates = candidates;
 
-        var sb = new StringBuilder();
-        sb.AppendLine($"Extracted {results.Count} crop{(results.Count == 1 ? string.Empty : "s")} from '{item.DisplayName}'.");
-        sb.AppendLine($"JPEGs saved to: {folder}");
-        sb.AppendLine();
-        foreach (var (crop, title) in results)
+        // Send directly to review and clear the image
+        ScanStatusText.Text = $"Sent {candidates.Count} book(s) to Review.";
+        if (App.Window is MainWindow mw)
         {
-            sb.AppendLine($"  [{crop.Label} {crop.Confidence:0.00}, {crop.PixelWidth}x{crop.PixelHeight}, {crop.Jpeg.Length / 1024} KB]");
-            sb.AppendLine($"    -> {title}");
-        }
-
-        var dialog = new ContentDialog
-        {
-            Title = "Title Extraction",
-            Content = new ScrollViewer
-            {
-                Content = new TextBlock
-                {
-                    Text = sb.ToString(),
-                    TextWrapping = TextWrapping.Wrap,
-                    IsTextSelectionEnabled = true,
-                    FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Consolas"),
-                },
-                MaxHeight = 480,
-                MaxWidth = 720,
-            },
-            PrimaryButtonText = "Send to Review",
-            SecondaryButtonText = "Open crop folder",
-            CloseButtonText = "Close",
-            DefaultButton = ContentDialogButton.Primary,
-            XamlRoot = this.XamlRoot,
-        };
-        var result = await dialog.ShowAsync();
-        if (result == ContentDialogResult.Primary)
-        {
-            if (App.Window is MainWindow mw)
-            {
-                mw.NavigateToReview(candidates, _activeImage?.FilePath);
-                await RemoveActiveImageAsync();
-            }
-        }
-        else if (result == ContentDialogResult.Secondary)
-        {
-            try
-            {
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(folder) { UseShellExecute = true });
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Failed to open folder: {ex.Message}");
-            }
+            mw.NavigateToReview(candidates, _activeImage?.FilePath);
+            await RemoveActiveImageAsync();
         }
     }
 
@@ -915,6 +874,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         AiAnalyzeButton.IsEnabled = false;
         Loader.IsActive = true;
         Loader.Visibility = Visibility.Visible;
+        ScanStatusText.Text = "Running AI image analysis...";
 
         try
         {
@@ -960,24 +920,12 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
             // Store candidates for the Review page to pick up
             _latestReviewCandidates = candidates;
 
-            var dialog = new ContentDialog
+            // Send directly to review and clear the image
+            ScanStatusText.Text = $"AI analysis complete — {candidates.Count} book(s) sent to Review.";
+            if (App.Window is MainWindow mw2)
             {
-                Title = "AI Analysis Complete",
-                Content = $"Detected {candidates.Count} book(s). Navigate to the Review tab to review and save them.",
-                PrimaryButtonText = "Go to Review",
-                CloseButtonText = "Stay here",
-                XamlRoot = this.XamlRoot,
-                DefaultButton = ContentDialogButton.Primary,
-            };
-            var result = await dialog.ShowAsync();
-            if (result == ContentDialogResult.Primary)
-            {
-                // Navigate to review page
-                if (App.Window is MainWindow mw)
-                {
-                    mw.NavigateToReview(candidates, _activeImage?.FilePath);
-                    await RemoveActiveImageAsync();
-                }
+                mw2.NavigateToReview(candidates, _activeImage?.FilePath);
+                await RemoveActiveImageAsync();
             }
         }
         catch (Exception ex)

@@ -11,6 +11,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <!-- Main viewer (row 0) -->
@@ -368,6 +369,21 @@
                     </StackPanel>
                 </Grid>
             </Grid>
+        </Border>
+
+        <!-- Slim status bar (row 2) -->
+        <Border
+            Grid.Row="2"
+            x:Name="ScanStatusBar"
+            Padding="12,4"
+            Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+            BorderBrush="{ThemeResource SurfaceStrokeColorDefaultBrush}"
+            BorderThickness="0,1,0,0">
+            <TextBlock
+                x:Name="ScanStatusText"
+                FontSize="12"
+                Opacity="0.8"
+                Text="Ready" />
         </Border>
     </Grid>
 </Page>

@@ -72,6 +72,7 @@ public sealed partial class ReviewPage : Page
 
         DisplayCurrentScanSet();
         UpdateScanNavigation();
+        ReviewStatusText.Text = $"{_scanQueue.Count} scan(s) in queue — {set.Candidates.Count} book(s) in current set.";
     }
 
     private void DisplayCurrentScanSet()
@@ -284,6 +285,7 @@ public sealed partial class ReviewPage : Page
 
         int saved = 0;
         var savedBooks = new List<Book>();
+        ReviewStatusText.Text = $"Saving {accepted.Count} book(s)...";
         foreach (var candidate in accepted)
         {
             var book = new Book
@@ -357,11 +359,11 @@ public sealed partial class ReviewPage : Page
             var settings = settingsStore.Load();
             if (!settings.IsConfigured)
             {
-                ReviewStatus.Text += " (Descriptions skipped: Azure OpenAI not configured)";
+                ReviewStatusText.Text = "Descriptions skipped: Azure OpenAI not configured.";
                 return;
             }
 
-            ReviewStatus.Text += " Fetching descriptions...";
+            ReviewStatusText.Text = $"Fetching descriptions for {books.Count} book(s)...";
 
             var descService = new BookDescriptionService(settingsStore);
             var bookList = books.Select(b => (b.Id, b.Title, b.Author)).ToList();
@@ -369,12 +371,14 @@ public sealed partial class ReviewPage : Page
 
             if (descriptions.Count == 0)
             {
-                ReviewStatus.Text += " (No descriptions returned from AI)";
+                ReviewStatusText.Text = "No descriptions returned from AI.";
                 return;
             }
 
-            foreach (var desc in descriptions)
+            for (int i = 0; i < descriptions.Count; i++)
             {
+                var desc = descriptions[i];
+                ReviewStatusText.Text = $"Storing description {i + 1} of {descriptions.Count}...";
                 var book = books.FirstOrDefault(b => b.Id == desc.BookId);
                 if (book != null)
                 {
@@ -382,7 +386,6 @@ public sealed partial class ReviewPage : Page
                     book.LongDescription = desc.LongDescription;
                     await repo.UpdateBookAsync(book);
 
-                    // Index for semantic search
                     var searchService = App.SemanticSearchService;
                     if (searchService != null)
                     {
@@ -391,11 +394,11 @@ public sealed partial class ReviewPage : Page
                 }
             }
 
-            ReviewStatus.Text += $" ✓ {descriptions.Count} description(s) added.";
+            ReviewStatusText.Text = $"✓ Saved {books.Count} book(s), {descriptions.Count} description(s) added.";
         }
         catch (Exception ex)
         {
-            ReviewStatus.Text += $" (Description error: {ex.Message})";
+            ReviewStatusText.Text = $"Description error: {ex.Message}";
         }
     }
 

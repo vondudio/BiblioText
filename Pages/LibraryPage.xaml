@@ -232,9 +232,25 @@
                         ZoomMode="Disabled"
                         HorizontalScrollBarVisibility="Disabled"
                         VerticalScrollBarVisibility="Disabled">
-                        <Image
-                            x:Name="BookshelfOverlayImage"
-                            Stretch="Uniform" />
+                        <Grid>
+                            <Image
+                                x:Name="BookshelfOverlayImage"
+                                Stretch="Uniform" />
+                            <Border
+                                x:Name="SpineOverlayBorder"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Background="#CC000000"
+                                Padding="8"
+                                CornerRadius="8"
+                                Visibility="Collapsed">
+                                <Image
+                                    x:Name="SpineOverlayImage"
+                                    MaxWidth="200"
+                                    MaxHeight="400"
+                                    Stretch="Uniform" />
+                            </Border>
+                        </Grid>
                     </ScrollViewer>
                 </Grid>
             </Border>

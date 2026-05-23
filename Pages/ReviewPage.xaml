@@ -13,6 +13,7 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <!-- Header with scan navigation -->
@@ -209,5 +210,20 @@
                     Style="{StaticResource AccentButtonStyle}" />
             </StackPanel>
         </Grid>
+
+        <!-- Slim status bar (row 4) -->
+        <Border
+            Grid.Row="4"
+            x:Name="ReviewStatusBar"
+            Padding="12,4"
+            Margin="0,8,0,0"
+            Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+            CornerRadius="4">
+            <TextBlock
+                x:Name="ReviewStatusText"
+                FontSize="12"
+                Opacity="0.8"
+                Text="Ready" />
+        </Border>
     </Grid>
 </Page>

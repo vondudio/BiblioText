@@ -251,6 +251,19 @@ public sealed partial class LibraryPage : Page
         }
 
         BookshelfOverlayImage.Source = new BitmapImage(new Uri(book.BookshelfImagePath));
+
+        // Overlay the spine scan on top of the bookshelf image
+        if (!string.IsNullOrWhiteSpace(book.SpineImagePath) && File.Exists(book.SpineImagePath))
+        {
+            SpineOverlayImage.Source = new BitmapImage(new Uri(book.SpineImagePath));
+            SpineOverlayBorder.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            SpineOverlayImage.Source = null;
+            SpineOverlayBorder.Visibility = Visibility.Collapsed;
+        }
+
         BookshelfOverlay.Visibility = Visibility.Visible;
         BookshelfOverlayScroller.ChangeView(0, 0, 1.0f, disableAnimation: true);
     }
@@ -299,6 +312,8 @@ public sealed partial class LibraryPage : Page
     {
         BookshelfOverlay.Visibility = Visibility.Collapsed;
         BookshelfOverlayImage.Source = null;
+        SpineOverlayImage.Source = null;
+        SpineOverlayBorder.Visibility = Visibility.Collapsed;
     }
 
     private static bool TryGetBook(object sender, out BookDisplay book)
