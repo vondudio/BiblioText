@@ -1483,26 +1483,43 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         int originalWidth = sourceBitmap.Width;
         int originalHeight = sourceBitmap.Height;
 
+        // Clone bitmap data on UI thread to avoid GDI+ threading issues
+        Bitmap cloned;
+        try
+        {
+            cloned = new Bitmap(originalWidth, originalHeight, sourceBitmap.PixelFormat);
+            using (var g = Graphics.FromImage(cloned))
+            {
+                g.DrawImage(sourceBitmap, 0, 0, originalWidth, originalHeight);
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Bitmap clone failed: {ex.Message}");
+            return [];
+        }
+
         return await Task.Run(() =>
         {
-            using var image = new Bitmap(sourceBitmap);
-            using var resized = BitmapFunctions.ResizeWithPadding(
-                image, model.InputWidth, model.InputHeight, out var letterbox);
-
-            string inputName = session.InputNames[0];
-            var tensor = BitmapFunctions.PreprocessBitmapForYolo26(resized);
-            var inputs = new List<NamedOnnxValue> { NamedOnnxValue.CreateFromTensor(inputName, tensor) };
-
-            using var results = session.Run(inputs);
-
-            return model.Head switch
+            using (cloned)
+            using (var resized = BitmapFunctions.ResizeWithPadding(
+                cloned, model.InputWidth, model.InputHeight, out var letterbox))
             {
-                ModelHead.Yolo26EndToEnd =>
-                    YOLOHelpers.ExtractYolo26EndToEnd(results[0].AsTensor<float>(), letterbox, model.Labels, confidence),
-                ModelHead.Yolo26OneToMany =>
-                    YOLOHelpers.ExtractYolo26OneToMany(results[0].AsTensor<float>(), letterbox, model.Labels, confidence),
-                _ => YOLOHelpers.ExtractYolo26EndToEnd(results[0].AsTensor<float>(), letterbox, model.Labels, confidence),
-            };
+                string inputName = session.InputNames[0];
+                var tensor = BitmapFunctions.PreprocessBitmapForYolo26(resized);
+                var inputs = new List<NamedOnnxValue> { NamedOnnxValue.CreateFromTensor(inputName, tensor) };
+
+                using var results = session.Run(inputs);
+
+                return model.Head switch
+                {
+                    ModelHead.Yolo26EndToEnd =>
+                        YOLOHelpers.ExtractYolo26EndToEnd(results[0].AsTensor<float>(), letterbox, model.Labels, confidence),
+                    ModelHead.Yolo26OneToMany =>
+                        YOLOHelpers.ExtractYolo26OneToMany(results[0].AsTensor<float>(), letterbox, model.Labels, confidence),
+                    _ => YOLOHelpers.ExtractYolo26EndToEnd(results[0].AsTensor<float>(), letterbox, model.Labels, confidence),
+                };
+            }
         });
     }
 }
