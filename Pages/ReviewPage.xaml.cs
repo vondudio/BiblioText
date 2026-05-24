@@ -96,8 +96,14 @@ public sealed partial class ReviewPage : Page
         }
 
         var set = _scanQueue[_currentScanIndex];
-        foreach (var c in set.Candidates)
+        var sorted = set.Candidates.OrderBy(c => c.Confidence).ToList();
+        foreach (var c in sorted)
         {
+            // Auto-reject entries with unknown/empty title and no author
+            if (IsUnknownTitle(c.EditedTitle) && string.IsNullOrWhiteSpace(c.EditedAuthor))
+            {
+                c.IsAccepted = false;
+            }
             _candidates.Add(c);
         }
 
@@ -113,6 +119,12 @@ public sealed partial class ReviewPage : Page
             ReviewList.Visibility = Visibility.Collapsed;
             CancelButton.Visibility = Visibility.Visible;
         }
+    }
+
+    private static bool IsUnknownTitle(string? title)
+    {
+        if (string.IsNullOrWhiteSpace(title)) return true;
+        return title.Trim().Equals("Unknown", StringComparison.OrdinalIgnoreCase);
     }
 
     private void UpdateScanNavigation()
