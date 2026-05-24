@@ -207,12 +207,8 @@ public sealed partial class ReviewPage : Page
         bitmapImage.SetSource(stream.AsRandomAccessStream());
         ImagePanelImage.Source = bitmapImage;
 
-        // Rotate horizontal spines to vertical
-        bool isHorizontal = bitmapImage.PixelWidth > bitmapImage.PixelHeight;
-        ImagePanelImage.RenderTransform = isHorizontal
-            ? new Microsoft.UI.Xaml.Media.RotateTransform { Angle = 90 }
-            : null;
-        ImagePanelImage.RenderTransformOrigin = new Windows.Foundation.Point(0.5, 0.5);
+        // No rotation in the panel — show full image with pan/zoom
+        ImagePanelImage.RenderTransform = null;
 
         ShowImagePanel();
     }
@@ -264,12 +260,9 @@ public sealed partial class ReviewPage : Page
                 bitmapImage.SetSource(stream.AsRandomAccessStream());
                 cropImage.Source = bitmapImage;
 
-                // Rotate horizontal spines to vertical
-                bool isHorizontal = bitmapImage.PixelWidth > bitmapImage.PixelHeight;
-                cropImage.RenderTransform = isHorizontal
-                    ? new Microsoft.UI.Xaml.Media.RotateTransform { Angle = 90 }
-                    : null;
-                cropImage.RenderTransformOrigin = new Windows.Foundation.Point(0.5, 0.5);
+                // Always rotate 90° for horizontal bookspine display;
+                // UniformToFill + Border clipping handles the center-crop to square
+                cropImage.RenderTransform = new Microsoft.UI.Xaml.Media.RotateTransform { Angle = 90 };
             }
         }
     }
