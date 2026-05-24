@@ -96,7 +96,7 @@
                                 Height="120"
                                 PointerPressed="CropThumbnail_PointerPressed"
                                 ToolTipService.ToolTip="Click to view spine crop">
-                                <Image x:Name="CropImage" Stretch="UniformToFill" RenderTransformOrigin="0.5,0.5" />
+                                <Image x:Name="CropImage" Stretch="UniformToFill" />
                             </Border>
 
                             <!-- Editable fields -->
