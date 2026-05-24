@@ -26,10 +26,10 @@ public sealed partial class SettingsPage : Page
         ApiVersionBox.Text = settings.ApiVersion ?? "2024-10-21";
         UseCameraToggle.IsOn = settings.UseCameraCapture;
 
-        SpinePromptBox.Text = settings.SpineExtractionPrompt ?? "";
-        BookshelfSystemPromptBox.Text = settings.BookshelfAnalysisSystemPrompt ?? "";
-        BookshelfUserPromptBox.Text = settings.BookshelfAnalysisUserPrompt ?? "";
-        DescriptionPromptBox.Text = settings.BookDescriptionPrompt ?? "";
+        SpinePromptBox.Text = settings.SpineExtractionPrompt ?? Services.DefaultPrompts.SpineExtraction;
+        BookshelfSystemPromptBox.Text = settings.BookshelfAnalysisSystemPrompt ?? Services.DefaultPrompts.BookshelfAnalysisSystem;
+        BookshelfUserPromptBox.Text = settings.BookshelfAnalysisUserPrompt ?? Services.DefaultPrompts.BookshelfAnalysisUser;
+        DescriptionPromptBox.Text = settings.BookDescriptionPrompt ?? Services.DefaultPrompts.BookDescription;
     }
 
     private void SaveButton_Click(object sender, RoutedEventArgs e)
