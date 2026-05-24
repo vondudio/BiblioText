@@ -206,12 +206,20 @@ public sealed partial class ReviewPage : Page
         using var stream = new MemoryStream(jpegData);
         bitmapImage.SetSource(stream.AsRandomAccessStream());
         ImagePanelImage.Source = bitmapImage;
+
+        // Rotate horizontal spines to vertical
+        bool isHorizontal = bitmapImage.PixelWidth > bitmapImage.PixelHeight;
+        ImagePanelImage.RenderTransform = isHorizontal
+            ? new Microsoft.UI.Xaml.Media.RotateTransform { Angle = 90 }
+            : null;
+        ImagePanelImage.RenderTransformOrigin = new Windows.Foundation.Point(0.5, 0.5);
+
         ShowImagePanel();
     }
 
     private void ShowImagePanel()
     {
-        ImagePanelColumn.Width = new GridLength(1, GridUnitType.Star);
+        ImagePanelColumn.Width = new GridLength(300);
         ImagePanel.Visibility = Visibility.Visible;
         ImagePanelScroller.ChangeView(0, 0, 1.0f, disableAnimation: true);
     }
@@ -255,6 +263,13 @@ public sealed partial class ReviewPage : Page
                 using var stream = new MemoryStream(candidate.CropJpeg);
                 bitmapImage.SetSource(stream.AsRandomAccessStream());
                 cropImage.Source = bitmapImage;
+
+                // Rotate horizontal spines to vertical
+                bool isHorizontal = bitmapImage.PixelWidth > bitmapImage.PixelHeight;
+                cropImage.RenderTransform = isHorizontal
+                    ? new Microsoft.UI.Xaml.Media.RotateTransform { Angle = 90 }
+                    : null;
+                cropImage.RenderTransformOrigin = new Windows.Foundation.Point(0.5, 0.5);
             }
         }
     }

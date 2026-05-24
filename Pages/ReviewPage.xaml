@@ -92,7 +92,7 @@
                                 Grid.Column="0"
                                 Background="{ThemeResource SubtleFillColorSecondaryBrush}"
                                 CornerRadius="4"
-                                Width="80"
+                                Width="120"
                                 VerticalAlignment="Stretch"
                                 PointerPressed="CropThumbnail_PointerPressed"
                                 ToolTipService.ToolTip="Click to view spine crop">
