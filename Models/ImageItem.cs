@@ -7,6 +7,7 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices.WindowsRuntime;
 using System.Threading.Tasks;
 using Windows.Storage.Streams;
 
@@ -75,37 +76,49 @@ internal sealed class ImageItem : INotifyPropertyChanged, IDisposable
 
     public static async Task<ImageItem> LoadAsync(string filePath)
     {
-        // Off-thread: load JPEG, EXIF-normalize, build the two PNG streams.
-        // BitmapImage itself is a UI-thread-only WinUI type, so we leave its
-        // construction + SetSourceAsync for the calling thread (which must be
-        // the UI thread - LoadAsync is invoked from button/picker handlers).
-        var (source, mainStream, thumbStream) = await Task.Run(() =>
+        // Off-thread: load JPEG, EXIF-normalize, encode to PNG byte arrays.
+        // BitmapImage is a UI-thread-only WinUI type, so we decode on the
+        // calling thread (which must be the UI thread).
+        var (source, mainBytes, thumbBytes) = await Task.Run(() =>
         {
             var bmp = new Bitmap(filePath);
             BitmapFunctions.NormalizeOrientation(bmp);
 
-            // Encode the main image PNG first, then crop for thumbnail.
-            // Both operations use the source bitmap — do them sequentially
-            // to avoid GDI+ concurrent access issues.
-            var ms = new InMemoryRandomAccessStream();
-            bmp.Save(ms.AsStream(), ImageFormat.Png);
-            ms.Seek(0);
+            byte[] mainPng;
+            using (var ms = new MemoryStream())
+            {
+                bmp.Save(ms, ImageFormat.Png);
+                mainPng = ms.ToArray();
+            }
 
-            // Now safe to read from bmp for the thumbnail
-            using Bitmap square = CenterCropToSquare(bmp);
-            using Bitmap scaled = BitmapFunctions.ResizeBitmap(square, ThumbnailSize, ThumbnailSize);
-            var ts = new InMemoryRandomAccessStream();
-            scaled.Save(ts.AsStream(), ImageFormat.Png);
-            ts.Seek(0);
+            byte[] thumbPng;
+            using (Bitmap square = CenterCropToSquare(bmp))
+            using (Bitmap scaled = BitmapFunctions.ResizeBitmap(square, ThumbnailSize, ThumbnailSize))
+            using (var ts = new MemoryStream())
+            {
+                scaled.Save(ts, ImageFormat.Png);
+                thumbPng = ts.ToArray();
+            }
 
-            return (bmp, ms, ts);
+            return (bmp, mainPng, thumbPng);
         });
 
-        // Back on the UI thread: BitmapImage construction + SetSourceAsync.
+        // Back on the UI thread: create BitmapImage from byte arrays.
         var sourceImage = new BitmapImage();
-        await sourceImage.SetSourceAsync(mainStream);
+        using (var ms = new InMemoryRandomAccessStream())
+        {
+            await ms.WriteAsync(mainBytes.AsBuffer());
+            ms.Seek(0);
+            await sourceImage.SetSourceAsync(ms);
+        }
+
         var thumb = new BitmapImage();
-        await thumb.SetSourceAsync(thumbStream);
+        using (var ts = new InMemoryRandomAccessStream())
+        {
+            await ts.WriteAsync(thumbBytes.AsBuffer());
+            ts.Seek(0);
+            await thumb.SetSourceAsync(ts);
+        }
 
         return new ImageItem(filePath, source, sourceImage, thumb);
     }
