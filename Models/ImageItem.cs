@@ -84,10 +84,14 @@ internal sealed class ImageItem : INotifyPropertyChanged, IDisposable
             var bmp = new Bitmap(filePath);
             BitmapFunctions.NormalizeOrientation(bmp);
 
+            // Encode the main image PNG first, then crop for thumbnail.
+            // Both operations use the source bitmap — do them sequentially
+            // to avoid GDI+ concurrent access issues.
             var ms = new InMemoryRandomAccessStream();
             bmp.Save(ms.AsStream(), ImageFormat.Png);
             ms.Seek(0);
 
+            // Now safe to read from bmp for the thumbnail
             using Bitmap square = CenterCropToSquare(bmp);
             using Bitmap scaled = BitmapFunctions.ResizeBitmap(square, ThumbnailSize, ThumbnailSize);
             var ts = new InMemoryRandomAccessStream();
@@ -111,9 +115,18 @@ internal sealed class ImageItem : INotifyPropertyChanged, IDisposable
         int side = Math.Min(source.Width, source.Height);
         int x = (source.Width - side) / 2;
         int y = (source.Height - side) / 2;
-        // Deep copy via Clone(Rectangle, PixelFormat) - this overload is documented
-        // to copy pixels (unlike the parameterless Clone() which shares the buffer).
-        return source.Clone(new Rectangle(x, y, side, side), source.PixelFormat);
+        // Use Graphics.DrawImage for a true deep copy — Bitmap.Clone(Rectangle)
+        // can share the underlying pixel buffer and produce corrupt results
+        // when the source is accessed concurrently.
+        var cropped = new Bitmap(side, side, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        using (var g = Graphics.FromImage(cropped))
+        {
+            g.DrawImage(source,
+                new Rectangle(0, 0, side, side),
+                new Rectangle(x, y, side, side),
+                GraphicsUnit.Pixel);
+        }
+        return cropped;
     }
 
     public void Dispose()
