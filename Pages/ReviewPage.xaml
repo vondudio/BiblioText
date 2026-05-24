@@ -191,13 +191,11 @@
                         VerticalScrollBarVisibility="Hidden"
                         HorizontalScrollMode="Enabled"
                         VerticalScrollMode="Enabled">
-                        <Viewbox Stretch="Uniform"
-                                 Width="{Binding ViewportWidth, ElementName=ImagePanelScroller}"
-                                 Height="{Binding ViewportHeight, ElementName=ImagePanelScroller}">
-                            <Image
-                                x:Name="ImagePanelImage"
-                                Stretch="Uniform" />
-                        </Viewbox>
+                        <Image
+                            x:Name="ImagePanelImage"
+                            Stretch="Uniform"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center" />
                     </ScrollViewer>
                 </Border>
             </Grid>
