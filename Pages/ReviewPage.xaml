@@ -82,7 +82,7 @@
                     <DataTemplate>
                         <Grid Padding="8" ColumnSpacing="12">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="60" />
+                                <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
@@ -92,7 +92,8 @@
                                 Grid.Column="0"
                                 Background="{ThemeResource SubtleFillColorSecondaryBrush}"
                                 CornerRadius="4"
-                                Height="80"
+                                Width="80"
+                                VerticalAlignment="Stretch"
                                 PointerPressed="CropThumbnail_PointerPressed"
                                 ToolTipService.ToolTip="Click to view spine crop">
                                 <Image x:Name="CropImage" Stretch="Uniform" />
