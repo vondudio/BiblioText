@@ -1105,15 +1105,25 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         try
         {
             var item = _activeImage;
+            var sourceBitmap = item.SourceBitmap;
+            int w = sourceBitmap.Width;
+            int h = sourceBitmap.Height;
 
-            // Convert System.Drawing.Bitmap to SoftwareBitmap via PNG bytes
-            byte[] pngBytes;
-            using (var ms = new MemoryStream())
+            // Deep-copy bitmap and encode to PNG off-thread to avoid
+            // GDI+ contention with detection Task.Run
+            byte[] pngBytes = await Task.Run(() =>
             {
-                item.SourceBitmap.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
-                pngBytes = ms.ToArray();
-            }
+                using var copy = new Bitmap(w, h, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+                using (var g = Graphics.FromImage(copy))
+                {
+                    g.DrawImage(sourceBitmap, 0, 0, w, h);
+                }
+                using var ms = new MemoryStream();
+                copy.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
+                return ms.ToArray();
+            });
 
+            // Decode to SoftwareBitmap on UI thread
             SoftwareBitmap softwareBitmap;
             using (var ras = new InMemoryRandomAccessStream())
             {
@@ -1133,22 +1143,28 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
                 if (op.Status != AIFeatureReadyResultState.Success)
                 {
                     StatusText.Text = "OCR not available on this system.";
+                    softwareBitmap.Dispose();
                     return;
                 }
             }
             else if (readyState != AIFeatureReadyState.Ready)
             {
                 StatusText.Text = $"OCR not available: {readyState}";
+                softwareBitmap.Dispose();
                 return;
             }
 
             var recognizer = await TextRecognizer.CreateAsync();
-            using var imageBuffer = ImageBuffer.CreateForSoftwareBitmap(softwareBitmap);
-            var result = recognizer.RecognizeTextFromImage(imageBuffer);
+            RecognizedText? result;
+            using (var imageBuffer = ImageBuffer.CreateForSoftwareBitmap(softwareBitmap))
+            {
+                result = recognizer.RecognizeTextFromImage(imageBuffer);
+            }
 
             if (result?.Lines == null || !result.Lines.Any())
             {
                 StatusText.Text = "OCR: no text found.";
+                softwareBitmap.Dispose();
                 return;
             }
 
@@ -1156,6 +1172,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
             OcrOverlay.Children.Clear();
             OcrOverlay.Width = softwareBitmap.PixelWidth;
             OcrOverlay.Height = softwareBitmap.PixelHeight;
+            softwareBitmap.Dispose();
 
             foreach (var line in result.Lines)
             {
