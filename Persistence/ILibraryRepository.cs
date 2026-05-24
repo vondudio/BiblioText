@@ -26,4 +26,8 @@ public interface ILibraryRepository
     // Scans
     Task<int> AddScanAsync(Scan scan);
     Task<List<Scan>> GetScansAsync();
+
+    // Image hashes (dedup)
+    Task<bool> ImageHashExistsAsync(string hash);
+    Task AddImageHashAsync(string hash, string filePath);
 }

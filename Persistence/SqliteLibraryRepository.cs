@@ -66,6 +66,13 @@ public sealed class SqliteLibraryRepository : ILibraryRepository, IDisposable
                 FOREIGN KEY (scan_id) REFERENCES scans(id),
                 FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE SET NULL
             );
+
+            CREATE TABLE IF NOT EXISTS image_hashes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                hash TEXT NOT NULL UNIQUE,
+                file_path TEXT NOT NULL,
+                imported_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
             """;
         await cmd.ExecuteNonQueryAsync();
 
@@ -338,6 +345,31 @@ public sealed class SqliteLibraryRepository : ILibraryRepository, IDisposable
     {
         if (_connection == null)
             throw new InvalidOperationException("Repository not initialized. Call InitializeAsync first.");
+    }
+
+    // Image hashes (dedup)
+
+    public async Task<bool> ImageHashExistsAsync(string hash)
+    {
+        EnsureConnected();
+        using var cmd = _connection!.CreateCommand();
+        cmd.CommandText = "SELECT COUNT(1) FROM image_hashes WHERE hash = @hash;";
+        cmd.Parameters.AddWithValue("@hash", hash);
+        var result = await cmd.ExecuteScalarAsync();
+        return Convert.ToInt32(result) > 0;
+    }
+
+    public async Task AddImageHashAsync(string hash, string filePath)
+    {
+        EnsureConnected();
+        using var cmd = _connection!.CreateCommand();
+        cmd.CommandText = """
+            INSERT OR IGNORE INTO image_hashes (hash, file_path)
+            VALUES (@hash, @filePath);
+            """;
+        cmd.Parameters.AddWithValue("@hash", hash);
+        cmd.Parameters.AddWithValue("@filePath", filePath);
+        await cmd.ExecuteNonQueryAsync();
     }
 
     public void Dispose()

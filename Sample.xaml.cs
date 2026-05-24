@@ -245,6 +245,35 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
             return existing;
         }
 
+        // Check image hash against DB for previously imported images
+        var repo = App.LibraryRepository;
+        if (repo != null)
+        {
+            string hash = await Task.Run(() => ComputeFileHash(filePath));
+            bool alreadyImported = await repo.ImageHashExistsAsync(hash);
+            if (alreadyImported)
+            {
+                var dialog = new ContentDialog
+                {
+                    Title = "Duplicate Image",
+                    Content = $"'{Path.GetFileName(filePath)}' has already been imported. Import again?",
+                    PrimaryButtonText = "Import Anyway",
+                    CloseButtonText = "Skip",
+                    XamlRoot = this.XamlRoot,
+                    DefaultButton = ContentDialogButton.Close,
+                };
+                var result = await dialog.ShowAsync();
+                if (result != ContentDialogResult.Primary)
+                {
+                    return null;
+                }
+            }
+            else
+            {
+                await repo.AddImageHashAsync(hash, filePath);
+            }
+        }
+
         ImageItem item;
         try
         {
@@ -262,6 +291,14 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
             await ActivateImageAsync(item);
         }
         return item;
+    }
+
+    private static string ComputeFileHash(string filePath)
+    {
+        using var sha = System.Security.Cryptography.SHA256.Create();
+        using var stream = File.OpenRead(filePath);
+        byte[] hashBytes = sha.ComputeHash(stream);
+        return Convert.ToHexString(hashBytes);
     }
 
     private bool _activating;
