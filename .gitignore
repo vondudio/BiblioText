@@ -63,3 +63,6 @@ Models/*.GPU.onnx
 Thumbs.db
 Desktop.ini
 .DS_Store
+
+# Reference samples
+Select_Text_From_ImageSample/
