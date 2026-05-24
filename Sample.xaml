@@ -221,9 +221,9 @@
                                                 CornerRadius="4">
                                                 <Image
                                                     Source="{x:Bind Thumbnail}"
-                                                    Stretch="UniformToFill"
-                                                    HorizontalAlignment="Stretch"
-                                                    VerticalAlignment="Stretch" />
+                                                    Stretch="Uniform"
+                                                    HorizontalAlignment="Center"
+                                                    VerticalAlignment="Center" />
                                             </Border>
                                             <TextBlock
                                                 Grid.Row="1"
