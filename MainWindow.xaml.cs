@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Windowing;
 using Windows.ApplicationModel.DataTransfer;
 
 namespace BiblioText;
@@ -13,6 +14,14 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         this.InitializeComponent();
+
+        // Start maximized with nav pane collapsed
+        if (AppWindow?.Presenter is OverlappedPresenter presenter)
+        {
+            presenter.Maximize();
+        }
+        NavView.IsPaneOpen = false;
+
         this.RootFrame.Loaded += (sender, args) =>
         {
             // Select the Scan tab by default
