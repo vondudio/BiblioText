@@ -256,63 +256,71 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         return item;
     }
 
+    private bool _activating;
+
     private async Task ActivateImageAsync(ImageItem item, bool forceRerun = false)
     {
-        // Selected-state flags.
-        if (_activeImage != item)
-        {
-            if (_activeImage != null)
-            {
-                _activeImage.IsSelected = false;
-            }
-            _activeImage = item;
-            item.IsSelected = true;
-            RemoveButton.IsEnabled = true;
-            AiAnalyzeButton.IsEnabled = true;
-        }
-
-        // Always swap to the pristine source first so any stale boxes from a previous
-        // render disappear instantly.
-        DefaultImage.Source = item.SourceImage;
-
-        if (_inferenceSession == null || _currentModel == null)
-        {
-            ExtractButton.IsEnabled = false;
-            return;
-        }
-
-        string cacheKey = CacheKey();
-        if (!forceRerun && item.Outputs.TryGetValue(cacheKey, out CachedOutput? cached))
-        {
-            DefaultImage.Source = cached.Image;
-            StatusText.Text = $"(cached) model={_currentModel.Id}  conf={ConfidenceSlider.Value:F2}  detections={cached.BoxPredictions.Count}";
-            StatusBar.Visibility = Visibility.Visible;
-            ExtractButton.IsEnabled = cached.BoxPredictions.Count > 0;
-            return;
-        }
-
-        // Skip auto-detection if checkbox is unchecked (user will use Refresh button)
-        if (!forceRerun && AutoDetectCheck.IsChecked != true)
-        {
-            ExtractButton.IsEnabled = false;
-            return;
-        }
-
-        ExtractButton.IsEnabled = false;
+        if (_activating) return;
+        _activating = true;
         try
         {
+            // Selected-state flags.
+            if (_activeImage != item)
+            {
+                if (_activeImage != null)
+                {
+                    _activeImage.IsSelected = false;
+                }
+                _activeImage = item;
+                item.IsSelected = true;
+                RemoveButton.IsEnabled = true;
+                AiAnalyzeButton.IsEnabled = true;
+            }
+
+            // Always swap to the pristine source first so any stale boxes from a previous
+            // render disappear instantly.
+            if (item.SourceImage != null)
+            {
+                DefaultImage.Source = item.SourceImage;
+            }
+
+            if (_inferenceSession == null || _currentModel == null)
+            {
+                ExtractButton.IsEnabled = false;
+                return;
+            }
+
+            string cacheKey = CacheKey();
+            if (!forceRerun && item.Outputs.TryGetValue(cacheKey, out CachedOutput? cached))
+            {
+                DefaultImage.Source = cached.Image;
+                StatusText.Text = $"(cached) model={_currentModel.Id}  conf={ConfidenceSlider.Value:F2}  detections={cached.BoxPredictions.Count}";
+                StatusBar.Visibility = Visibility.Visible;
+                ExtractButton.IsEnabled = cached.BoxPredictions.Count > 0;
+                return;
+            }
+
+            // Skip auto-detection if checkbox is unchecked (user will use Refresh button)
+            if (!forceRerun && AutoDetectCheck.IsChecked != true)
+            {
+                ExtractButton.IsEnabled = false;
+                return;
+            }
+
+            ExtractButton.IsEnabled = false;
             await DetectObjects(item);
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"DetectObjects failed: {ex}");
-            DispatcherQueue.TryEnqueue(() =>
-            {
-                Loader.IsActive = false;
-                Loader.Visibility = Visibility.Collapsed;
-                StatusText.Text = $"Detection failed: {ex.Message}";
-                StatusBar.Visibility = Visibility.Visible;
-            });
+            Debug.WriteLine($"ActivateImageAsync failed: {ex}");
+            Loader.IsActive = false;
+            Loader.Visibility = Visibility.Collapsed;
+            StatusText.Text = $"Detection failed: {ex.Message}";
+            StatusBar.Visibility = Visibility.Visible;
+        }
+        finally
+        {
+            _activating = false;
         }
     }
 
@@ -1370,6 +1378,10 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
             sw.Restart();
 
             using IDisposableReadOnlyCollection<DisposableNamedOnnxValue> results = session.Run(inputs);
+            if (results == null || results.Count == 0)
+            {
+                return (Box: new List<Prediction>(), Mask: (List<MaskedPrediction>?)null);
+            }
             inferenceMs = sw.ElapsedMilliseconds;
             sw.Restart();
 
@@ -1391,6 +1403,12 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
                 }
                 case ModelHead.Yolo26Segmentation:
                 {
+                    if (results.Count < 2)
+                    {
+                        var t = results[0].AsTensor<float>();
+                        boxOutput = YOLOHelpers.ExtractYolo26EndToEnd(t, letterbox, model.Labels, confidence);
+                        break;
+                    }
                     var detTensor = results[0].AsTensor<float>();
                     var protoTensor = results[1].AsTensor<float>();
                     maskOutput = YOLOHelpers.ExtractYolo26Segmentation(
@@ -1404,6 +1422,11 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
                 case ModelHead.Yolov4Anchor:
                 default:
                 {
+                    if (results.Count < 3)
+                    {
+                        boxOutput = new List<Prediction>();
+                        break;
+                    }
                     var grids = new List<Tensor<float>>
                     {
                         results[0].AsTensor<float>(),
@@ -1424,15 +1447,25 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
             return (Box: boxOutput, Mask: maskOutput);
         });
 
-        int detectionCount = detectionResult.Box.Count;
-        BitmapImage outputImage = detectionResult.Mask is { Count: > 0 }
-            ? BitmapFunctions.RenderMaskedPredictions(image, detectionResult.Mask)
-            : BitmapFunctions.RenderPredictions(image, detectionResult.Box);
+        int detectionCount = detectionResult.Box?.Count ?? 0;
+        BitmapImage outputImage;
+        try
+        {
+            outputImage = detectionResult.Mask is { Count: > 0 }
+                ? BitmapFunctions.RenderMaskedPredictions(image, detectionResult.Mask)
+                : BitmapFunctions.RenderPredictions(image, detectionResult.Box ?? []);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"RenderPredictions failed: {ex}");
+            image.Dispose();
+            throw;
+        }
 
         item.Outputs[cacheKey] = new CachedOutput
         {
             Image = outputImage,
-            BoxPredictions = detectionResult.Box,
+            BoxPredictions = detectionResult.Box ?? [],
             MaskedPredictions = detectionResult.Mask,
         };
 
