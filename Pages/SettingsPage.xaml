@@ -87,7 +87,7 @@
                     PlaceholderText="(default prompt)"
                     AcceptsReturn="True"
                     TextWrapping="Wrap"
-                    Height="120" />
+                    Height="240" />
 
                 <TextBox
                     x:Name="BookshelfSystemPromptBox"
@@ -95,7 +95,7 @@
                     PlaceholderText="(default prompt)"
                     AcceptsReturn="True"
                     TextWrapping="Wrap"
-                    Height="120" />
+                    Height="240" />
 
                 <TextBox
                     x:Name="BookshelfUserPromptBox"
@@ -103,7 +103,7 @@
                     PlaceholderText="(default prompt)"
                     AcceptsReturn="True"
                     TextWrapping="Wrap"
-                    Height="120" />
+                    Height="240" />
 
                 <TextBox
                     x:Name="DescriptionPromptBox"
@@ -111,9 +111,12 @@
                     PlaceholderText="(default prompt)"
                     AcceptsReturn="True"
                     TextWrapping="Wrap"
-                    Height="120" />
+                    Height="240" />
 
-                <Button Content="Reset Prompts to Defaults" Click="ResetPromptsButton_Click" />
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <Button Content="Update Prompts" Click="SaveButton_Click" Style="{StaticResource AccentButtonStyle}" />
+                    <Button Content="Reset to Defaults" Click="ResetPromptsButton_Click" />
+                </StackPanel>
             </StackPanel>
         </StackPanel>
     </ScrollViewer>
