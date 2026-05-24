@@ -85,7 +85,6 @@
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="72" />
                                 <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
 
                             <!-- Crop thumbnail (Library-style button with image) -->
@@ -167,14 +166,6 @@
                                     </Button>
                                 </Grid>
                             </StackPanel>
-
-                            <!-- Accept/Reject toggle -->
-                            <ToggleSwitch
-                                Grid.Column="2"
-                                VerticalAlignment="Center"
-                                IsOn="{Binding IsAccepted, Mode=TwoWay}"
-                                OnContent="Accept"
-                                OffContent="Reject" />
                         </Grid>
                     </DataTemplate>
                 </ListView.ItemTemplate>
@@ -236,14 +227,24 @@
                 Spacing="12">
                 <Button Content="Cancel Import" x:Name="CancelButton" Click="CancelButton_Click"
                         Visibility="Collapsed" />
-                <Button Content="Reject Selected" x:Name="RejectSelectedButton" Click="RejectSelectedButton_Click" IsEnabled="False" />
-                <Button Content="Accept All" x:Name="AcceptAllButton" Click="AcceptAllButton_Click" />
-                <Button Content="Reject All" x:Name="RejectAllButton" Click="RejectAllButton_Click" />
+                <Button x:Name="DeleteSelectedButton" Click="DeleteSelectedButton_Click" IsEnabled="False"
+                        ToolTipService.ToolTip="Delete selected books from review">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE74D;" FontSize="14" />
+                        <TextBlock Text="Delete" />
+                    </StackPanel>
+                </Button>
                 <Button
-                    Content="Save to Library"
-                    x:Name="SaveButton"
-                    Click="SaveButton_Click"
-                    Style="{StaticResource AccentButtonStyle}" />
+                    x:Name="SendToLibraryButton"
+                    Click="SendToLibraryButton_Click"
+                    IsEnabled="False"
+                    Style="{StaticResource AccentButtonStyle}"
+                    ToolTipService.ToolTip="Save selected books to library">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE736;" FontSize="14" />
+                        <TextBlock Text="Send to Library" />
+                    </StackPanel>
+                </Button>
             </StackPanel>
         </Grid>
 

@@ -53,30 +53,20 @@ internal sealed class ScanWorkflowService
         {
             ct.ThrowIfCancellationRequested();
             var crop = crops[i];
-            var title = await _titleExtractor.ExtractAsync(crop, ct);
-
-            // Split "title, author" format if present
-            string detectedTitle = title;
-            string? detectedAuthor = null;
-            if (title.Contains(',') && !title.StartsWith("("))
-            {
-                var parts = title.Split(',', 2);
-                detectedTitle = parts[0].Trim();
-                detectedAuthor = parts.Length > 1 ? parts[1].Trim() : null;
-            }
+            var result = await _titleExtractor.ExtractAsync(crop, ct);
 
             candidates.Add(new ReviewCandidate
             {
                 Index = i + 1,
-                DetectedTitle = detectedTitle,
-                DetectedAuthor = detectedAuthor,
-                EditedTitle = detectedTitle,
-                EditedAuthor = detectedAuthor,
+                DetectedTitle = result.Title,
+                DetectedAuthor = result.Author,
+                EditedTitle = result.Title,
+                EditedAuthor = result.Author,
                 IsAccepted = true,
                 CropJpeg = crop.Jpeg,
                 PixelWidth = crop.PixelWidth,
                 PixelHeight = crop.PixelHeight,
-                Confidence = crop.Confidence
+                Confidence = result.Confidence
             });
         }
 

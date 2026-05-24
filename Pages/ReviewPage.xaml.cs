@@ -206,17 +206,19 @@ public sealed partial class ReviewPage : Page
 
     private void ReviewList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        // Multi-select: update reject button state, etc.
         int selected = ReviewList.SelectedItems.Count;
-        RejectSelectedButton.IsEnabled = selected > 0;
+        DeleteSelectedButton.IsEnabled = selected > 0;
+        SendToLibraryButton.IsEnabled = selected > 0;
     }
 
-    private void AcceptAllButton_Click(object sender, RoutedEventArgs e)
+    private void DeleteSelectedButton_Click(object sender, RoutedEventArgs e)
     {
-        foreach (var c in _candidates)
+        var toRemove = ReviewList.SelectedItems.OfType<ReviewCandidate>().ToList();
+        foreach (var c in toRemove)
         {
-            c.IsAccepted = true;
+            _candidates.Remove(c);
         }
+        ReviewStatus.Text = $"{_candidates.Count} book(s) remaining.";
     }
 
     private void ReviewList_ContainerContentChanging(ListViewBase sender, ContainerContentChangingEventArgs args)
@@ -243,38 +245,11 @@ public sealed partial class ReviewPage : Page
         }
     }
 
-    private void RejectAllButton_Click(object sender, RoutedEventArgs e)
+    private async void SendToLibraryButton_Click(object sender, RoutedEventArgs e)
     {
-        foreach (var c in _candidates)
+        var selected = ReviewList.SelectedItems.OfType<ReviewCandidate>().ToList();
+        if (selected.Count == 0)
         {
-            c.IsAccepted = false;
-        }
-    }
-
-    private void RejectSelectedButton_Click(object sender, RoutedEventArgs e)
-    {
-        foreach (var item in ReviewList.SelectedItems)
-        {
-            if (item is ReviewCandidate c)
-            {
-                c.IsAccepted = false;
-            }
-        }
-    }
-
-    private async void SaveButton_Click(object sender, RoutedEventArgs e)
-    {
-        var accepted = _candidates.Where(c => c.IsAccepted).ToList();
-        if (accepted.Count == 0)
-        {
-            var dialog = new ContentDialog
-            {
-                Title = "Nothing to save",
-                Content = "No books are accepted. Toggle at least one book to 'Accept' before saving.",
-                CloseButtonText = "OK",
-                XamlRoot = this.XamlRoot
-            };
-            await dialog.ShowAsync();
             return;
         }
 
@@ -299,8 +274,8 @@ public sealed partial class ReviewPage : Page
 
         int saved = 0;
         var savedBooks = new List<Book>();
-        ReviewStatusText.Text = $"Saving {accepted.Count} book(s)...";
-        foreach (var candidate in accepted)
+        ReviewStatusText.Text = $"Saving {selected.Count} book(s)...";
+        foreach (var candidate in selected)
         {
             var book = new Book
             {
@@ -330,7 +305,7 @@ public sealed partial class ReviewPage : Page
         }
 
         // Remove saved candidates from the list
-        foreach (var candidate in accepted)
+        foreach (var candidate in selected)
         {
             _candidates.Remove(candidate);
         }

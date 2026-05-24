@@ -34,11 +34,16 @@ internal sealed class StubBookTitleExtractor : IBookTitleExtractor
 {
     private int _counter;
 
-    public async Task<string> ExtractAsync(BookCrop crop, CancellationToken ct = default)
+    public async Task<ExtractionResult> ExtractAsync(BookCrop crop, CancellationToken ct = default)
     {
         // Simulate the Azure roundtrip so the UI sees a realistic latency profile.
         await Task.Delay(150, ct);
         int n = Interlocked.Increment(ref _counter);
-        return $"(stub #{n}) {crop.Label} {crop.PixelWidth}x{crop.PixelHeight} ({crop.Jpeg.Length / 1024} KB)";
+        return new ExtractionResult
+        {
+            Title = $"(stub #{n}) {crop.Label} {crop.PixelWidth}x{crop.PixelHeight}",
+            Author = "",
+            Confidence = 0.5
+        };
     }
 }

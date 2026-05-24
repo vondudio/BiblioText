@@ -903,53 +903,33 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
             await Task.Run(() => CropExtractor.SaveAll(crops, folder));
 
             // Pipe each crop through the title extractor
-            var extracted = new List<(BookCrop Crop, string Title)>(crops.Count);
+            var extracted = new List<(BookCrop Crop, ExtractionResult Result)>(crops.Count);
             for (int ci = 0; ci < crops.Count; ci++)
             {
                 var c = crops[ci];
                 ScanStatusText.Text = $"Extracting title {ci + 1} of {crops.Count}...";
-                string title = await _titleExtractor.ExtractAsync(c);
-                extracted.Add((c, title));
+                var result = await _titleExtractor.ExtractAsync(c);
+                extracted.Add((c, result));
             }
 
             // Build candidates and send to review
             var candidates = new List<Models.ReviewCandidate>();
             for (int i = 0; i < extracted.Count; i++)
             {
-                var (crop, title) = extracted[i];
-                string detectedTitle = title;
-                string detectedAuthor = "";
-                if (title.Contains(" - "))
-                {
-                    var parts = title.Split(" - ", 2);
-                    detectedTitle = parts[0].Trim();
-                    detectedAuthor = parts[1].Trim();
-                }
-                else if (title.Contains(" by "))
-                {
-                    var parts = title.Split(" by ", 2);
-                    detectedTitle = parts[0].Trim();
-                    detectedAuthor = parts[1].Trim();
-                }
-                else if (title.Contains(','))
-                {
-                    var parts = title.Split(',', 2);
-                    detectedTitle = parts[0].Trim();
-                    detectedAuthor = parts[1].Trim();
-                }
+                var (crop, result) = extracted[i];
 
                 candidates.Add(new Models.ReviewCandidate
                 {
                     Index = i + 1,
-                    DetectedTitle = detectedTitle,
-                    DetectedAuthor = detectedAuthor,
-                    EditedTitle = detectedTitle,
-                    EditedAuthor = detectedAuthor,
+                    DetectedTitle = result.Title,
+                    DetectedAuthor = result.Author,
+                    EditedTitle = result.Title,
+                    EditedAuthor = result.Author,
                     IsAccepted = true,
                     CropJpeg = crop.Jpeg,
                     PixelWidth = crop.PixelWidth,
                     PixelHeight = crop.PixelHeight,
-                    Confidence = crop.Confidence
+                    Confidence = result.Confidence
                 });
             }
             _latestReviewCandidates = candidates;
