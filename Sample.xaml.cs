@@ -1312,14 +1312,23 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         Loader.Visibility = Visibility.Visible;
 
         var model = _currentModel;
+        var session = _inferenceSession;
         float confidence = (float)ConfidenceSlider.Value;
         string cacheKey = CacheKey();
 
         // Deep-copy the cached pristine source so RenderPredictions always draws boxes
-        // on a fresh canvas. Bitmap.Clone() (parameterless) is a shallow clone that
-        // shares the underlying pixel buffer with the source - using it here would let
-        // the Graphics.FromImage draw calls bake boxes into item.SourceBitmap.
-        Bitmap image = new Bitmap(item.SourceBitmap);
+        // on a fresh canvas.
+        Bitmap image;
+        try
+        {
+            image = new Bitmap(item.SourceBitmap);
+        }
+        catch
+        {
+            Loader.IsActive = false;
+            Loader.Visibility = Visibility.Collapsed;
+            return;
+        }
         int originalWidth = image.Width;
         int originalHeight = image.Height;
 
@@ -1335,7 +1344,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
                 image, model.InputWidth, model.InputHeight, out var letterbox);
 
             List<NamedOnnxValue> inputs;
-            string inputName = _inferenceSession!.InputNames[0];
+            string inputName = session.InputNames[0];
 
             switch (model.Layout)
             {
@@ -1348,7 +1357,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
                 case TensorLayout.Nhwc:
                 default:
                 {
-                    var dims = _inferenceSession.InputMetadata[inputName].Dimensions;
+                    var dims = session.InputMetadata[inputName].Dimensions;
                     dims[0] = 1;
                     Tensor<float> input = new DenseTensor<float>(dims);
                     input = BitmapFunctions.PreprocessBitmapForYOLO(resizedImage, input);
@@ -1360,7 +1369,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
             preprocessMs = sw.ElapsedMilliseconds;
             sw.Restart();
 
-            using IDisposableReadOnlyCollection<DisposableNamedOnnxValue> results = _inferenceSession!.Run(inputs);
+            using IDisposableReadOnlyCollection<DisposableNamedOnnxValue> results = session.Run(inputs);
             inferenceMs = sw.ElapsedMilliseconds;
             sw.Restart();
 
