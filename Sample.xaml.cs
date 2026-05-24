@@ -1500,18 +1500,32 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
             catch (Exception ex)
             {
                 Debug.WriteLine($"Inference Task.Run failed: {ex}");
-                return (Box: new List<Prediction>(), Mask: (List<MaskedPrediction>?)null);
+                return (Box: (List<Prediction>?)null, Mask: (List<MaskedPrediction>?)null);
             }
         });
         _detecting = false;
 
-        int detectionCount = detectionResult.Box?.Count ?? 0;
+        // If inference failed (null Box), don't cache — allow retry
+        if (detectionResult.Box == null)
+        {
+            image.Dispose();
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                Loader.IsActive = false;
+                Loader.Visibility = Visibility.Collapsed;
+                StatusText.Text = "Detection failed — click Refresh to retry.";
+                StatusBar.Visibility = Visibility.Visible;
+            });
+            return;
+        }
+
+        int detectionCount = detectionResult.Box.Count;
         BitmapImage outputImage;
         try
         {
             outputImage = detectionResult.Mask is { Count: > 0 }
                 ? BitmapFunctions.RenderMaskedPredictions(image, detectionResult.Mask)
-                : BitmapFunctions.RenderPredictions(image, detectionResult.Box ?? []);
+                : BitmapFunctions.RenderPredictions(image, detectionResult.Box);
         }
         catch (Exception ex)
         {
@@ -1523,7 +1537,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         item.Outputs[cacheKey] = new CachedOutput
         {
             Image = outputImage,
-            BoxPredictions = detectionResult.Box ?? [],
+            BoxPredictions = detectionResult.Box,
             MaskedPredictions = detectionResult.Mask,
         };
 
