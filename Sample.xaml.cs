@@ -43,6 +43,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
     private string _modelsDir = string.Empty;
     private string _assetsDir = string.Empty;
     private bool _suppressModelChange;
+    private bool _detecting; // true while DetectObjects Task.Run is in-flight
 
     // Secondary model for clipping (bounding boxes) — loaded on first extract/AI call
     private InferenceSession? _clipSession;
@@ -192,7 +193,8 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
 
     private async Task LoadModel(ModelInfo model)
     {
-        _inferenceSession?.Dispose();
+        // If detection is running, keep old session alive until it finishes
+        var oldSession = _inferenceSession;
         _inferenceSession = null;
         _currentModel = model;
 
@@ -214,6 +216,12 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
             sessionOptions.RegisterOrtExtensions();
             _inferenceSession = new InferenceSession(modelPath, sessionOptions);
         });
+
+        // Dispose old session only after new one is ready and detection has finished
+        if (oldSession != null && !_detecting)
+        {
+            oldSession.Dispose();
+        }
     }
 
     // ---------------- Image collection ----------------
@@ -312,10 +320,13 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         }
         catch (Exception ex)
         {
+            _detecting = false;
             Debug.WriteLine($"ActivateImageAsync failed: {ex}");
             Loader.IsActive = false;
             Loader.Visibility = Visibility.Collapsed;
-            StatusText.Text = $"Detection failed: {ex.Message}";
+            // Show method name from stack trace for easier debugging
+            string location = ex.TargetSite?.Name ?? "unknown";
+            StatusText.Text = $"Detection failed in {location}: {ex.Message}";
             StatusBar.Visibility = Visibility.Visible;
         }
         finally
@@ -1345,6 +1356,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         long inferenceMs = 0;
         long postprocessMs = 0;
 
+        _detecting = true;
         var detectionResult = await Task.Run(() =>
         {
             var sw = Stopwatch.StartNew();
@@ -1446,6 +1458,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
             postprocessMs = sw.ElapsedMilliseconds;
             return (Box: boxOutput, Mask: maskOutput);
         });
+        _detecting = false;
 
         int detectionCount = detectionResult.Box?.Count ?? 0;
         BitmapImage outputImage;
