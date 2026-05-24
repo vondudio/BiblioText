@@ -67,6 +67,7 @@
         <!-- Main content: two-column layout -->
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="2*" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
@@ -179,57 +180,27 @@
                 </ListView.ItemTemplate>
             </ListView>
 
-            <!-- Right column removed — using overlay instead -->
-        </Grid>
-
-        <!-- Bookspine overlay (Library-style, tap to close) -->
-        <Grid
-            x:Name="SpineOverlay"
-            Grid.RowSpan="5"
-            Background="#99000000"
-            Visibility="Collapsed"
-            Tapped="SpineOverlay_Tapped">
+            <!-- Right: Bookspine image panel (1/3 screen) -->
             <Border
-                Margin="48"
-                Padding="16"
-                MaxWidth="600"
-                MaxHeight="900"
-                HorizontalAlignment="Center"
-                VerticalAlignment="Center"
-                Background="{ThemeResource LayerFillColorDefaultBrush}"
-                CornerRadius="12"
-                Tapped="SpineOverlayContent_Tapped">
-                <Grid RowSpacing="12">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                    </Grid.RowDefinitions>
-
-                    <Button
-                        Grid.Row="0"
-                        Content="✕"
-                        HorizontalAlignment="Right"
-                        Click="CloseSpineOverlay_Click"
-                        Padding="8,4"
-                        ToolTipService.ToolTip="Close image" />
-
-                    <ScrollViewer
-                        x:Name="SpineOverlayScroller"
-                        Grid.Row="1"
-                        ZoomMode="Enabled"
-                        MinZoomFactor="1.0"
-                        MaxZoomFactor="5.0"
-                        HorizontalScrollBarVisibility="Hidden"
-                        VerticalScrollBarVisibility="Hidden"
-                        HorizontalScrollMode="Enabled"
-                        VerticalScrollMode="Enabled">
-                        <Image
-                            x:Name="SpineOverlayImage"
-                            Stretch="Uniform"
-                            HorizontalAlignment="Center"
-                            VerticalAlignment="Center" />
-                    </ScrollViewer>
-                </Grid>
+                Grid.Column="1"
+                Margin="12,0,0,0"
+                Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                CornerRadius="8">
+                <ScrollViewer
+                    x:Name="SpineOverlayScroller"
+                    ZoomMode="Enabled"
+                    MinZoomFactor="1.0"
+                    MaxZoomFactor="5.0"
+                    HorizontalScrollBarVisibility="Hidden"
+                    VerticalScrollBarVisibility="Hidden"
+                    HorizontalScrollMode="Enabled"
+                    VerticalScrollMode="Enabled">
+                    <Image
+                        x:Name="SpineOverlayImage"
+                        Stretch="Uniform"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center" />
+                </ScrollViewer>
             </Border>
         </Grid>
 

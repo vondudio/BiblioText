@@ -186,39 +186,22 @@ public sealed partial class ReviewPage : Page
     {
         if (sender is FrameworkElement fe && fe.DataContext is ReviewCandidate candidate && candidate.CropJpeg != null)
         {
-            ShowSpineOverlay(candidate.CropJpeg);
+            ShowSpineImage(candidate.CropJpeg);
         }
     }
 
-    private void ShowSpineOverlay(byte[] jpegData)
+    private void ShowSpineImage(byte[] jpegData)
     {
         var bitmapImage = new BitmapImage();
         using var stream = new MemoryStream(jpegData);
         bitmapImage.SetSource(stream.AsRandomAccessStream());
         SpineOverlayImage.Source = bitmapImage;
-        SpineOverlay.Visibility = Visibility.Visible;
         SpineOverlayScroller.ChangeView(0, 0, 1.0f, disableAnimation: true);
     }
 
     private void CloseSpineOverlay()
     {
-        SpineOverlay.Visibility = Visibility.Collapsed;
         SpineOverlayImage.Source = null;
-    }
-
-    private void CloseSpineOverlay_Click(object sender, RoutedEventArgs e)
-    {
-        CloseSpineOverlay();
-    }
-
-    private void SpineOverlay_Tapped(object sender, TappedRoutedEventArgs e)
-    {
-        CloseSpineOverlay();
-    }
-
-    private void SpineOverlayContent_Tapped(object sender, TappedRoutedEventArgs e)
-    {
-        e.Handled = true; // Don't close when tapping inside the content
     }
 
     private void ReviewList_SelectionChanged(object sender, SelectionChangedEventArgs e)
