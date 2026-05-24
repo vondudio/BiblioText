@@ -68,44 +68,65 @@
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
-                <ColumnDefinition x:Name="ImagePanelColumn" Width="0" />
             </Grid.ColumnDefinitions>
 
             <!-- Left: Book list (editable) -->
             <ListView
                 x:Name="ReviewList"
                 Grid.Column="0"
-                SelectionMode="None"
+                SelectionMode="Multiple"
+                SelectionChanged="ReviewList_SelectionChanged"
                 Visibility="Collapsed"
                 ContainerContentChanging="ReviewList_ContainerContentChanging">
                 <ListView.ItemTemplate>
                     <DataTemplate>
-                        <Grid Padding="8" ColumnSpacing="12">
+                        <Grid Padding="8,12" ColumnSpacing="12">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="72" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
 
-                            <!-- Crop thumbnail (click to view in right panel) -->
-                            <Border
+                            <!-- Crop thumbnail (Library-style button with image) -->
+                            <Button
                                 Grid.Column="0"
-                                Background="{ThemeResource SubtleFillColorSecondaryBrush}"
-                                CornerRadius="4"
-                                Width="120"
-                                Height="120"
-                                PointerPressed="CropThumbnail_PointerPressed"
-                                ToolTipService.ToolTip="Click to view spine crop">
-                                <Image x:Name="CropImage" Stretch="UniformToFill" />
-                            </Border>
+                                Width="64"
+                                Height="84"
+                                Padding="0"
+                                HorizontalAlignment="Left"
+                                VerticalAlignment="Center"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                Click="CropThumbnail_Click"
+                                ToolTipService.ToolTip="View spine crop">
+                                <Border
+                                    Width="64"
+                                    Height="84"
+                                    CornerRadius="4"
+                                    Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                                    <Grid>
+                                        <FontIcon
+                                            HorizontalAlignment="Center"
+                                            VerticalAlignment="Center"
+                                            FontFamily="Segoe MDL2 Assets"
+                                            Glyph="&#xE736;"
+                                            FontSize="20"
+                                            Opacity="0.3" />
+                                        <Image x:Name="CropImage" Stretch="UniformToFill" />
+                                        <Border
+                                            HorizontalAlignment="Left"
+                                            VerticalAlignment="Top"
+                                            Background="{ThemeResource AccentFillColorDefaultBrush}"
+                                            CornerRadius="0,0,4,0"
+                                            Padding="3,1">
+                                            <TextBlock Text="{Binding DisplayLabel}" FontSize="9" Foreground="White" FontWeight="Bold" />
+                                        </Border>
+                                    </Grid>
+                                </Border>
+                            </Button>
 
                             <!-- Editable fields -->
                             <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="6">
-                                <TextBlock
-                                    Text="{Binding DisplayLabel}"
-                                    FontSize="11"
-                                    Opacity="0.5"
-                                    FontFamily="Consolas" />
                                 <Grid>
                                     <TextBox
                                         Header="Title"
@@ -158,32 +179,43 @@
                 </ListView.ItemTemplate>
             </ListView>
 
-            <!-- Right: Floating image panel -->
-            <Grid
-                x:Name="ImagePanel"
-                Grid.Column="1"
-                Visibility="Collapsed"
-                Margin="12,0,0,0">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                </Grid.RowDefinitions>
+            <!-- Right column removed — using overlay instead -->
+        </Grid>
 
-                <Button
-                    Grid.Row="0"
-                    Content="✕"
-                    HorizontalAlignment="Right"
-                    Click="CloseImagePanel_Click"
-                    Padding="8,4"
-                    Margin="0,0,0,8"
-                    ToolTipService.ToolTip="Close image" />
+        <!-- Bookspine overlay (Library-style, tap to close) -->
+        <Grid
+            x:Name="SpineOverlay"
+            Grid.RowSpan="5"
+            Background="#99000000"
+            Visibility="Collapsed"
+            Tapped="SpineOverlay_Tapped">
+            <Border
+                Margin="48"
+                Padding="16"
+                MaxWidth="600"
+                MaxHeight="900"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Background="{ThemeResource LayerFillColorDefaultBrush}"
+                CornerRadius="12"
+                Tapped="SpineOverlayContent_Tapped">
+                <Grid RowSpacing="12">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
 
-                <Border
-                    Grid.Row="1"
-                    Background="{ThemeResource SubtleFillColorSecondaryBrush}"
-                    CornerRadius="8">
+                    <Button
+                        Grid.Row="0"
+                        Content="✕"
+                        HorizontalAlignment="Right"
+                        Click="CloseSpineOverlay_Click"
+                        Padding="8,4"
+                        ToolTipService.ToolTip="Close image" />
+
                     <ScrollViewer
-                        x:Name="ImagePanelScroller"
+                        x:Name="SpineOverlayScroller"
+                        Grid.Row="1"
                         ZoomMode="Enabled"
                         MinZoomFactor="1.0"
                         MaxZoomFactor="5.0"
@@ -192,13 +224,13 @@
                         HorizontalScrollMode="Enabled"
                         VerticalScrollMode="Enabled">
                         <Image
-                            x:Name="ImagePanelImage"
+                            x:Name="SpineOverlayImage"
                             Stretch="Uniform"
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center" />
                     </ScrollViewer>
-                </Border>
-            </Grid>
+                </Grid>
+            </Border>
         </Grid>
 
         <!-- Actions -->
@@ -233,6 +265,7 @@
                 Spacing="12">
                 <Button Content="Cancel Import" x:Name="CancelButton" Click="CancelButton_Click"
                         Visibility="Collapsed" />
+                <Button Content="Reject Selected" x:Name="RejectSelectedButton" Click="RejectSelectedButton_Click" IsEnabled="False" />
                 <Button Content="Accept All" x:Name="AcceptAllButton" Click="AcceptAllButton_Click" />
                 <Button Content="Reject All" x:Name="RejectAllButton" Click="RejectAllButton_Click" />
                 <Button

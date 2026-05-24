@@ -85,7 +85,7 @@ public sealed partial class ReviewPage : Page
     private void DisplayCurrentScanSet()
     {
         _candidates.Clear();
-        CloseImagePanel();
+        CloseSpineOverlay();
 
         if (_currentScanIndex < 0 || _currentScanIndex >= _scanQueue.Count)
         {
@@ -182,68 +182,50 @@ public sealed partial class ReviewPage : Page
         }
     }
 
-    private void CropThumbnail_PointerPressed(object sender, PointerRoutedEventArgs e)
+    private void CropThumbnail_Click(object sender, RoutedEventArgs e)
     {
         if (sender is FrameworkElement fe && fe.DataContext is ReviewCandidate candidate && candidate.CropJpeg != null)
         {
-            ShowImageInPanel(candidate.CropJpeg);
-        }
-        else if (_currentScanIndex >= 0 && _currentScanIndex < _scanQueue.Count)
-        {
-            // Show source image if no crop
-            var path = _scanQueue[_currentScanIndex].SourceImagePath;
-            if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
-            {
-                ImagePanelImage.Source = new BitmapImage(new Uri(path));
-                ShowImagePanel();
-            }
+            ShowSpineOverlay(candidate.CropJpeg);
         }
     }
 
-    private void ShowImageInPanel(byte[] jpegData)
+    private void ShowSpineOverlay(byte[] jpegData)
     {
         var bitmapImage = new BitmapImage();
         using var stream = new MemoryStream(jpegData);
         bitmapImage.SetSource(stream.AsRandomAccessStream());
-        ImagePanelImage.Source = bitmapImage;
-
-        // Rotate horizontal spines to display vertically in the panel
-        bool isHorizontal = bitmapImage.PixelWidth > bitmapImage.PixelHeight;
-        if (isHorizontal)
-        {
-            ImagePanelImage.RenderTransform = new Microsoft.UI.Xaml.Media.RotateTransform { Angle = 90 };
-            ImagePanelImage.RenderTransformOrigin = new Windows.Foundation.Point(0.5, 0.5);
-        }
-        else
-        {
-            ImagePanelImage.RenderTransform = null;
-        }
-
-        ShowImagePanel();
+        SpineOverlayImage.Source = bitmapImage;
+        SpineOverlay.Visibility = Visibility.Visible;
+        SpineOverlayScroller.ChangeView(0, 0, 1.0f, disableAnimation: true);
     }
 
-    private void ShowImagePanel()
+    private void CloseSpineOverlay()
     {
-        ImagePanelColumn.Width = new GridLength(300);
-        ImagePanel.Visibility = Visibility.Visible;
-        ImagePanelScroller.ChangeView(0, 0, 1.0f, disableAnimation: true);
+        SpineOverlay.Visibility = Visibility.Collapsed;
+        SpineOverlayImage.Source = null;
     }
 
-    private void CloseImagePanel()
+    private void CloseSpineOverlay_Click(object sender, RoutedEventArgs e)
     {
-        ImagePanel.Visibility = Visibility.Collapsed;
-        ImagePanelColumn.Width = new GridLength(0);
-        ImagePanelImage.Source = null;
+        CloseSpineOverlay();
     }
 
-    private void CloseImagePanel_Click(object sender, RoutedEventArgs e)
+    private void SpineOverlay_Tapped(object sender, TappedRoutedEventArgs e)
     {
-        CloseImagePanel();
+        CloseSpineOverlay();
     }
 
-    private void ImagePanel_Tapped(object sender, TappedRoutedEventArgs e)
+    private void SpineOverlayContent_Tapped(object sender, TappedRoutedEventArgs e)
     {
-        CloseImagePanel();
+        e.Handled = true; // Don't close when tapping inside the content
+    }
+
+    private void ReviewList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        // Multi-select: update reject button state, etc.
+        int selected = ReviewList.SelectedItems.Count;
+        RejectSelectedButton.IsEnabled = selected > 0;
     }
 
     private void AcceptAllButton_Click(object sender, RoutedEventArgs e)
@@ -260,14 +242,20 @@ public sealed partial class ReviewPage : Page
 
         if (args.Item is ReviewCandidate candidate && candidate.CropJpeg is { Length: > 0 })
         {
-            var grid = args.ItemContainer.ContentTemplateRoot as Grid;
-            var border = grid?.Children.OfType<Microsoft.UI.Xaml.Controls.Border>().FirstOrDefault();
-            if (border?.Child is Image cropImage)
+            // Navigate: Grid > Button (col 0) > Border > Grid > Image (named CropImage)
+            var rootGrid = args.ItemContainer.ContentTemplateRoot as Grid;
+            var button = rootGrid?.Children.OfType<Button>().FirstOrDefault();
+            if (button?.Content is Microsoft.UI.Xaml.Controls.Border border
+                && border.Child is Grid innerGrid)
             {
-                var bitmapImage = new BitmapImage();
-                using var stream = new MemoryStream(candidate.CropJpeg);
-                bitmapImage.SetSource(stream.AsRandomAccessStream());
-                cropImage.Source = bitmapImage;
+                var cropImage = innerGrid.Children.OfType<Image>().FirstOrDefault();
+                if (cropImage != null)
+                {
+                    var bitmapImage = new BitmapImage();
+                    using var stream = new MemoryStream(candidate.CropJpeg);
+                    bitmapImage.SetSource(stream.AsRandomAccessStream());
+                    cropImage.Source = bitmapImage;
+                }
             }
         }
     }
@@ -277,6 +265,17 @@ public sealed partial class ReviewPage : Page
         foreach (var c in _candidates)
         {
             c.IsAccepted = false;
+        }
+    }
+
+    private void RejectSelectedButton_Click(object sender, RoutedEventArgs e)
+    {
+        foreach (var item in ReviewList.SelectedItems)
+        {
+            if (item is ReviewCandidate c)
+            {
+                c.IsAccepted = false;
+            }
         }
     }
 
