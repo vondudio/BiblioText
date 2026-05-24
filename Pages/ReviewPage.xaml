@@ -93,7 +93,7 @@
                                 Background="{ThemeResource SubtleFillColorSecondaryBrush}"
                                 CornerRadius="4"
                                 Width="120"
-                                VerticalAlignment="Stretch"
+                                Height="120"
                                 PointerPressed="CropThumbnail_PointerPressed"
                                 ToolTipService.ToolTip="Click to view spine crop">
                                 <Image x:Name="CropImage" Stretch="Uniform" />
