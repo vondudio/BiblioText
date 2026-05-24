@@ -1359,6 +1359,8 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         _detecting = true;
         var detectionResult = await Task.Run(() =>
         {
+            try
+            {
             var sw = Stopwatch.StartNew();
             using var resizedImage = BitmapFunctions.ResizeWithPadding(
                 image, model.InputWidth, model.InputHeight, out var letterbox);
@@ -1457,6 +1459,12 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
 
             postprocessMs = sw.ElapsedMilliseconds;
             return (Box: boxOutput, Mask: maskOutput);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Inference Task.Run failed: {ex}");
+                return (Box: new List<Prediction>(), Mask: (List<MaskedPrediction>?)null);
+            }
         });
         _detecting = false;
 
