@@ -1,11 +1,16 @@
 using BiblioText.Models;
 using BiblioText.Services;
 using BiblioText.Utils;
+using Microsoft.Graphics.Imaging;
 using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
+using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
+using Microsoft.Windows.AI;
+using Microsoft.Windows.AI.Imaging;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -14,6 +19,7 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices.WindowsRuntime;
 using System.Text;
 using System.Threading.Tasks;
 using Windows.Devices.Enumeration;
@@ -1085,6 +1091,124 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         if (_activeImage != null)
         {
             await ActivateImageAsync(_activeImage, forceRerun: true);
+        }
+    }
+
+    private async void OcrButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_activeImage == null) return;
+
+        OcrButton.IsEnabled = false;
+        StatusText.Text = "Running OCR...";
+        StatusBar.Visibility = Visibility.Visible;
+
+        try
+        {
+            var item = _activeImage;
+
+            // Convert System.Drawing.Bitmap to SoftwareBitmap via PNG bytes
+            byte[] pngBytes;
+            using (var ms = new MemoryStream())
+            {
+                item.SourceBitmap.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
+                pngBytes = ms.ToArray();
+            }
+
+            SoftwareBitmap softwareBitmap;
+            using (var ras = new InMemoryRandomAccessStream())
+            {
+                await ras.WriteAsync(pngBytes.AsBuffer());
+                ras.Seek(0);
+                var decoder = await Windows.Graphics.Imaging.BitmapDecoder.CreateAsync(ras);
+                softwareBitmap = await decoder.GetSoftwareBitmapAsync(
+                    Windows.Graphics.Imaging.BitmapPixelFormat.Bgra8,
+                    Windows.Graphics.Imaging.BitmapAlphaMode.Premultiplied);
+            }
+
+            // Ensure TextRecognizer is ready
+            var readyState = TextRecognizer.GetReadyState();
+            if (readyState == AIFeatureReadyState.NotReady)
+            {
+                var op = await TextRecognizer.EnsureReadyAsync();
+                if (op.Status != AIFeatureReadyResultState.Success)
+                {
+                    StatusText.Text = "OCR not available on this system.";
+                    return;
+                }
+            }
+            else if (readyState != AIFeatureReadyState.Ready)
+            {
+                StatusText.Text = $"OCR not available: {readyState}";
+                return;
+            }
+
+            var recognizer = await TextRecognizer.CreateAsync();
+            using var imageBuffer = ImageBuffer.CreateForSoftwareBitmap(softwareBitmap);
+            var result = recognizer.RecognizeTextFromImage(imageBuffer);
+
+            if (result?.Lines == null || !result.Lines.Any())
+            {
+                StatusText.Text = "OCR: no text found.";
+                return;
+            }
+
+            // Render OCR text overlay on the canvas
+            OcrOverlay.Children.Clear();
+            OcrOverlay.Width = softwareBitmap.PixelWidth;
+            OcrOverlay.Height = softwareBitmap.PixelHeight;
+
+            foreach (var line in result.Lines)
+            {
+                try
+                {
+                    var bgBrush = new SolidColorBrush { Color = Colors.Black, Opacity = 0.6 };
+                    double height = Math.Abs(line.BoundingBox.TopRight.Y - line.BoundingBox.BottomRight.Y) * 0.85;
+
+                    var block = new TextBlock
+                    {
+                        Text = line.Text,
+                        Foreground = new SolidColorBrush(Colors.White),
+                        FontSize = height > 0 ? height : 1,
+                    };
+
+                    var grid = new Grid
+                    {
+                        Background = bgBrush,
+                        CornerRadius = new CornerRadius(4),
+                        Padding = new Thickness(4, 2, 4, 2),
+                    };
+                    grid.Children.Add(block);
+
+                    OcrOverlay.Children.Add(grid);
+                    Canvas.SetLeft(grid, line.BoundingBox.TopLeft.X);
+                    Canvas.SetTop(grid, line.BoundingBox.TopLeft.Y);
+                }
+                catch { }
+            }
+
+            int lineCount = result.Lines.Count();
+            OcrOverlay.Visibility = Visibility.Visible;
+            StatusText.Text = $"OCR: {lineCount} line(s) detected. Clearing in 10s...";
+
+            // Auto-hide after 10 seconds
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(10) };
+            timer.Tick += (s, _) =>
+            {
+                timer.Stop();
+                OcrOverlay.Visibility = Visibility.Collapsed;
+                OcrOverlay.Children.Clear();
+                StatusText.Text = "OCR overlay cleared.";
+            };
+            timer.Start();
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"OCR failed: {ex.Message}";
+            Debug.WriteLine($"OCR failed: {ex}");
+        }
+        finally
+        {
+            OcrButton.IsEnabled = true;
         }
     }
 

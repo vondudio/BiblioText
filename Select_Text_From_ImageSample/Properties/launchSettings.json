@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "Select Text From ImageSample (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "Select Text From ImageSample (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

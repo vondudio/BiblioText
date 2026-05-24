@@ -42,7 +42,10 @@
                     Stretch="Uniform"
                     Width="{Binding ViewportWidth, ElementName=ImageScroller}"
                     Height="{Binding ViewportHeight, ElementName=ImageScroller}">
-                    <Image x:Name="DefaultImage" />
+                    <Grid>
+                        <Image x:Name="DefaultImage" />
+                        <Canvas x:Name="OcrOverlay" Visibility="Collapsed" />
+                    </Grid>
                 </Viewbox>
             </ScrollViewer>
             <ProgressRing
@@ -133,6 +136,14 @@
                             Padding="6,4"
                             VerticalAlignment="Center">
                             <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE72C;" FontSize="14" />
+                        </Button>
+                        <Button
+                            x:Name="OcrButton"
+                            Click="OcrButton_Click"
+                            ToolTipService.ToolTip="OCR — detect text in image"
+                            Padding="6,4"
+                            VerticalAlignment="Center">
+                            <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE8F2;" FontSize="14" />
                         </Button>
                     </StackPanel>
                 </StackPanel>
