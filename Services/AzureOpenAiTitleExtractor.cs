@@ -33,6 +33,10 @@ internal sealed class AzureOpenAiTitleExtractor : IBookTitleExtractor
 
         var dataUrl = "data:image/jpeg;base64," + Convert.ToBase64String(crop.Jpeg);
 
+        var spinePrompt = string.IsNullOrWhiteSpace(settings.SpineExtractionPrompt)
+            ? DefaultPrompts.SpineExtraction
+            : settings.SpineExtractionPrompt;
+
         var requestBody = new
         {
             messages = new object[]
@@ -42,15 +46,7 @@ internal sealed class AzureOpenAiTitleExtractor : IBookTitleExtractor
                     role = "user",
                     content = new object[]
                     {
-                        new { type = "text", text = """
-                            Analyze this book spine image. Return a JSON object with exactly these fields:
-                            {"title": "Book Title", "author": "Author Name", "confidence": 0.95}
-                            - title: the book title visible on the spine
-                            - author: the author name if visible, or "" if not
-                            - confidence: a number 0.0 to 1.0 indicating how confident you are in the reading (1.0 = clearly readable, 0.0 = unreadable)
-                            If this is not a book spine or text is completely unreadable, return {"title": "unknown", "author": "", "confidence": 0.0}
-                            Return ONLY the JSON object, no markdown formatting.
-                            """ },
+                        new { type = "text", text = spinePrompt },
                         new { type = "image_url", image_url = new { url = dataUrl, detail = "high" } }
                     }
                 }

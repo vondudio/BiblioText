@@ -75,6 +75,46 @@
                     OnContent="Enabled"
                     Toggled="UseCameraToggle_Toggled" />
             </StackPanel>
+
+            <!-- AI Prompts -->
+            <StackPanel Spacing="12">
+                <TextBlock Text="AI Prompts" Style="{StaticResource SubtitleTextBlockStyle}" />
+                <TextBlock Text="Customize the prompts sent to Azure OpenAI. Leave blank to use defaults." Opacity="0.7" TextWrapping="Wrap" />
+
+                <TextBox
+                    x:Name="SpinePromptBox"
+                    Header="Spine Title Extraction"
+                    PlaceholderText="(default prompt)"
+                    AcceptsReturn="True"
+                    TextWrapping="Wrap"
+                    Height="120" />
+
+                <TextBox
+                    x:Name="BookshelfSystemPromptBox"
+                    Header="Bookshelf Analysis — System Prompt"
+                    PlaceholderText="(default prompt)"
+                    AcceptsReturn="True"
+                    TextWrapping="Wrap"
+                    Height="120" />
+
+                <TextBox
+                    x:Name="BookshelfUserPromptBox"
+                    Header="Bookshelf Analysis — User Prompt"
+                    PlaceholderText="(default prompt)"
+                    AcceptsReturn="True"
+                    TextWrapping="Wrap"
+                    Height="120" />
+
+                <TextBox
+                    x:Name="DescriptionPromptBox"
+                    Header="Book Description Generation"
+                    PlaceholderText="(default prompt)"
+                    AcceptsReturn="True"
+                    TextWrapping="Wrap"
+                    Height="120" />
+
+                <Button Content="Reset Prompts to Defaults" Click="ResetPromptsButton_Click" />
+            </StackPanel>
         </StackPanel>
     </ScrollViewer>
 </Page>

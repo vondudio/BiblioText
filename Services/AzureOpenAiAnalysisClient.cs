@@ -33,6 +33,13 @@ internal sealed class AzureOpenAiAnalysisClient
 
         var dataUrl = "data:image/jpeg;base64," + Convert.ToBase64String(imageJpeg);
 
+        var systemPrompt = string.IsNullOrWhiteSpace(settings.BookshelfAnalysisSystemPrompt)
+            ? DefaultPrompts.BookshelfAnalysisSystem
+            : settings.BookshelfAnalysisSystemPrompt;
+        var userPrompt = string.IsNullOrWhiteSpace(settings.BookshelfAnalysisUserPrompt)
+            ? DefaultPrompts.BookshelfAnalysisUser
+            : settings.BookshelfAnalysisUserPrompt;
+
         var requestBody = new
         {
             messages = new object[]
@@ -40,14 +47,14 @@ internal sealed class AzureOpenAiAnalysisClient
                 new
                 {
                     role = "system",
-                    content = BookshelfAnalysisPrompt.SystemPrompt
+                    content = systemPrompt
                 },
                 new
                 {
                     role = "user",
                     content = new object[]
                     {
-                        new { type = "text", text = BookshelfAnalysisPrompt.UserPrompt },
+                        new { type = "text", text = userPrompt },
                         new { type = "image_url", image_url = new { url = dataUrl, detail = "high" } }
                     }
                 }

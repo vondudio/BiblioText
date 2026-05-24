@@ -40,6 +40,10 @@ internal sealed class BookDescriptionService
             sb.AppendLine($"{i + 1}. \"{title}\" by {author ?? "Unknown"}");
         }
 
+        var descriptionPrompt = string.IsNullOrWhiteSpace(settings.BookDescriptionPrompt)
+            ? DefaultPrompts.BookDescription
+            : settings.BookDescriptionPrompt;
+
         var requestBody = new
         {
             messages = new object[]
@@ -47,17 +51,7 @@ internal sealed class BookDescriptionService
                 new
                 {
                     role = "system",
-                    content = """
-                        You are a knowledgeable book reference assistant. Given a list of books (title and author),
-                        return a JSON object with descriptions for each book.
-                        
-                        For each book provide:
-                        - "short_description": 1-2 sentences describing what the book is about
-                        - "long_description": A concise summary paragraph (3-5 sentences) covering the book's main themes, content, and significance
-                        
-                        If you don't recognize a book, provide your best guess based on the title and author,
-                        or state "Description unavailable" for both fields.
-                        """
+                    content = descriptionPrompt
                 },
                 new
                 {

@@ -3,11 +3,21 @@
 namespace BiblioText.Services;
 
 /// <summary>
-/// Prompt templates for full-image bookshelf analysis via Azure OpenAI vision.
+/// Default prompt templates. Used when the user hasn't customized prompts in Settings.
 /// </summary>
-internal static class BookshelfAnalysisPrompt
+internal static class DefaultPrompts
 {
-    public const string SystemPrompt = """
+    public const string SpineExtraction = """
+        Analyze this book spine image. Return a JSON object with exactly these fields:
+        {"title": "Book Title", "author": "Author Name", "confidence": 0.95}
+        - title: the book title visible on the spine
+        - author: the author name if visible, or "" if not
+        - confidence: a number 0.0 to 1.0 indicating how confident you are in the reading (1.0 = clearly readable, 0.0 = unreadable)
+        If this is not a book spine or text is completely unreadable, return {"title": "unknown", "author": "", "confidence": 0.0}
+        Return ONLY the JSON object, no markdown formatting.
+        """;
+
+    public const string BookshelfAnalysisSystem = """
         You are a precise book-spine reader. You analyze photographs of bookshelves and identify
         every fully visible book spine. You return structured JSON with the detected books.
         
@@ -20,7 +30,7 @@ internal static class BookshelfAnalysisPrompt
         - Set confidence to a value between 0.0 and 1.0 based on text legibility.
         """;
 
-    public const string UserPrompt = """
+    public const string BookshelfAnalysisUser = """
         Analyze this bookshelf image. Identify all fully visible book spines and return a JSON object with this exact structure:
         
         {
@@ -35,5 +45,17 @@ internal static class BookshelfAnalysisPrompt
         }
         
         Return ONLY the JSON object. Include every readable book spine.
+        """;
+
+    public const string BookDescription = """
+        You are a knowledgeable book reference assistant. Given a list of books (title and author),
+        return a JSON object with descriptions for each book.
+        
+        For each book provide:
+        - "short_description": 1-2 sentences describing what the book is about
+        - "long_description": A concise summary paragraph (3-5 sentences) covering the book's main themes, content, and significance
+        
+        If you don't recognize a book, provide your best guess based on the title and author,
+        or state "Description unavailable" for both fields.
         """;
 }
