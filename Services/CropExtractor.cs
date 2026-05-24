@@ -120,7 +120,11 @@ internal static class CropExtractor
         }
         else
         {
-            crop = source.Clone(rect, source.PixelFormat);
+            crop = new Bitmap(w, h, PixelFormat.Format24bppRgb);
+            using (var g = Graphics.FromImage(crop))
+            {
+                g.DrawImage(source, new Rectangle(0, 0, w, h), rect, GraphicsUnit.Pixel);
+            }
         }
 
         crop = MaybeDownscale(crop, opts.MaxLongEdgePx);
@@ -151,7 +155,11 @@ internal static class CropExtractor
             return null;
         }
 
-        Bitmap crop = source.Clone(rect, source.PixelFormat);
+        var crop = new Bitmap(w, h, PixelFormat.Format24bppRgb);
+        using (var g = Graphics.FromImage(crop))
+        {
+            g.DrawImage(source, new Rectangle(0, 0, w, h), rect, GraphicsUnit.Pixel);
+        }
         crop = MaybeDownscale(crop, opts.MaxLongEdgePx);
         try
         {
