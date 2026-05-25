@@ -1109,18 +1109,31 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
             int w = sourceBitmap.Width;
             int h = sourceBitmap.Height;
 
-            // Deep-copy bitmap and encode to PNG off-thread to avoid
-            // GDI+ contention with detection Task.Run
-            byte[] pngBytes = await Task.Run(() =>
+            // Deep-copy on UI thread where we have exclusive GDI+ access,
+            // then encode to PNG off-thread
+            Bitmap copy;
+            try
             {
-                using var copy = new Bitmap(w, h, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+                copy = new Bitmap(w, h, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
                 using (var g = Graphics.FromImage(copy))
                 {
                     g.DrawImage(sourceBitmap, 0, 0, w, h);
                 }
-                using var ms = new MemoryStream();
-                copy.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
-                return ms.ToArray();
+            }
+            catch (Exception ex)
+            {
+                StatusText.Text = $"OCR: bitmap copy failed — {ex.Message}";
+                return;
+            }
+
+            byte[] pngBytes = await Task.Run(() =>
+            {
+                using (copy)
+                using (var ms = new MemoryStream())
+                {
+                    copy.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
+                    return ms.ToArray();
+                }
             });
 
             // Decode to SoftwareBitmap on UI thread
