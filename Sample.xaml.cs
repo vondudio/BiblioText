@@ -81,17 +81,6 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
 
     public Sample()
     {
-        this.Unloaded += (s, e) =>
-        {
-            _confidenceDebounce?.Stop();
-            _inferenceSession?.Dispose();
-            _clipSession?.Dispose();
-            foreach (var img in _images)
-            {
-                img.Dispose();
-            }
-            _images.Clear();
-        };
         this.InitializeComponent();
         this.NavigationCacheMode = Microsoft.UI.Xaml.Navigation.NavigationCacheMode.Required;
 
