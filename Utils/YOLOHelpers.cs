@@ -420,11 +420,14 @@ internal static class YOLOHelpers
 
     /// <summary>
     /// Extracts predictions from RF-DETR ONNX output.
-    /// Outputs: boxes [1,300,4] (cx,cy,w,h in input coords), logits [1,300], classes [1,300].
+    /// Outputs: boxes [1,300,4], logits [1,300], classes [1,300].
+    /// RF-DETR uses direct resize (no letterbox padding), so boxes map
+    /// directly from input coordinates to original image coordinates.
     /// </summary>
     public static List<Prediction> ExtractRfDetr(
         IReadOnlyCollection<Microsoft.ML.OnnxRuntime.DisposableNamedOnnxValue> results,
-        Letterbox letterbox,
+        int originalWidth,
+        int originalHeight,
         int inputWidth,
         int inputHeight,
         IReadOnlyList<string> labels,
@@ -457,6 +460,11 @@ internal static class YOLOHelpers
         var predictions = new List<Prediction>();
         int numDetections = logitsTensor.Dimensions[1]; // 300
 
+        // Scale factors: RF-DETR outputs are relative to the 560×560 input
+        // which is a direct resize of the original image (no letterbox padding)
+        float scaleX = (float)originalWidth / inputWidth;
+        float scaleY = (float)originalHeight / inputHeight;
+
         for (int i = 0; i < numDetections; i++)
         {
             float score = logitsTensor[0, i];
@@ -472,33 +480,27 @@ internal static class YOLOHelpers
 
             float xmin, ymin, xmax, ymax;
 
-            // Detect format: values <= 1.0 are normalized [0-1], otherwise pixel coords
-            bool normalized = v0 <= 1.0f && v1 <= 1.0f && v2 <= 1.0f && v3 <= 1.0f
-                              && (v2 > v0 || v3 > v1); // rules out cx,cy,w,h when all < 1
-
-            if (normalized && v2 > v0 && v3 > v1)
+            // Detect format: values in 0–1 range = normalized coords
+            if (v0 <= 1.0f && v1 <= 1.0f && v2 <= 1.0f && v3 <= 1.0f)
             {
-                // Normalized [x1, y1, x2, y2] in 0-1 range → scale to input dimensions
-                xmin = v0 * inputWidth;
-                ymin = v1 * inputHeight;
-                xmax = v2 * inputWidth;
-                ymax = v3 * inputHeight;
+                // Normalized [x1, y1, x2, y2] → scale to original image directly
+                xmin = v0 * originalWidth;
+                ymin = v1 * originalHeight;
+                xmax = v2 * originalWidth;
+                ymax = v3 * originalHeight;
             }
             else
             {
-                // cx, cy, w, h in pixel coordinates
-                xmin = v0 - v2 / 2f;
-                ymin = v1 - v3 / 2f;
-                xmax = v0 + v2 / 2f;
-                ymax = v1 + v3 / 2f;
+                // Pixel coordinates in input space → scale to original
+                xmin = v0 * scaleX;
+                ymin = v1 * scaleY;
+                xmax = v2 * scaleX;
+                ymax = v3 * scaleY;
             }
-
-            // Undo letterbox to get original image coordinates
-            var box = letterbox.UndoOnBox(xmin, ymin, xmax, ymax);
 
             predictions.Add(new Prediction
             {
-                Box = box,
+                Box = new Box(xmin, ymin, xmax, ymax),
                 Label = label,
                 Confidence = score,
             });
