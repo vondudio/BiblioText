@@ -1596,7 +1596,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
                 case ModelHead.RfDetr:
                 {
                     boxOutput = YOLOHelpers.ExtractRfDetr(
-                        results,
+                        results, letterbox,
                         originalWidth, originalHeight,
                         model.InputWidth, model.InputHeight,
                         model.Labels, confidence);
