@@ -465,16 +465,33 @@ internal static class YOLOHelpers
             int classIdx = classesTensor[0, i];
             string label = classIdx >= 0 && classIdx < labels.Count ? labels[classIdx] : $"class_{classIdx}";
 
-            // Boxes are [cx, cy, w, h] in input (560×560) coordinates
-            float cx = boxesTensor[0, i, 0];
-            float cy = boxesTensor[0, i, 1];
-            float bw = boxesTensor[0, i, 2];
-            float bh = boxesTensor[0, i, 3];
+            float v0 = boxesTensor[0, i, 0];
+            float v1 = boxesTensor[0, i, 1];
+            float v2 = boxesTensor[0, i, 2];
+            float v3 = boxesTensor[0, i, 3];
 
-            float xmin = cx - bw / 2f;
-            float ymin = cy - bh / 2f;
-            float xmax = cx + bw / 2f;
-            float ymax = cy + bh / 2f;
+            float xmin, ymin, xmax, ymax;
+
+            // Detect format: values <= 1.0 are normalized [0-1], otherwise pixel coords
+            bool normalized = v0 <= 1.0f && v1 <= 1.0f && v2 <= 1.0f && v3 <= 1.0f
+                              && (v2 > v0 || v3 > v1); // rules out cx,cy,w,h when all < 1
+
+            if (normalized && v2 > v0 && v3 > v1)
+            {
+                // Normalized [x1, y1, x2, y2] in 0-1 range → scale to input dimensions
+                xmin = v0 * inputWidth;
+                ymin = v1 * inputHeight;
+                xmax = v2 * inputWidth;
+                ymax = v3 * inputHeight;
+            }
+            else
+            {
+                // cx, cy, w, h in pixel coordinates
+                xmin = v0 - v2 / 2f;
+                ymin = v1 - v3 / 2f;
+                xmax = v0 + v2 / 2f;
+                ymax = v1 + v3 / 2f;
+            }
 
             // Undo letterbox to get original image coordinates
             var box = letterbox.UndoOnBox(xmin, ymin, xmax, ymax);
