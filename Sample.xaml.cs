@@ -1593,6 +1593,14 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
                     boxOutput = maskOutput.ConvertAll(m => m.ToPrediction());
                     break;
                 }
+                case ModelHead.RfDetr:
+                {
+                    boxOutput = YOLOHelpers.ExtractRfDetr(
+                        results, letterbox,
+                        model.InputWidth, model.InputHeight,
+                        model.Labels, confidence);
+                    break;
+                }
                 case ModelHead.Yolov4Anchor:
                 default:
                 {

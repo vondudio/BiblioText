@@ -417,4 +417,76 @@ internal static class YOLOHelpers
 
         return union <= 0 ? 0 : intersection / union;
     }
+
+    /// <summary>
+    /// Extracts predictions from RF-DETR ONNX output.
+    /// Outputs: boxes [1,300,4] (cx,cy,w,h in input coords), logits [1,300], classes [1,300].
+    /// </summary>
+    public static List<Prediction> ExtractRfDetr(
+        IReadOnlyCollection<Microsoft.ML.OnnxRuntime.DisposableNamedOnnxValue> results,
+        Letterbox letterbox,
+        int inputWidth,
+        int inputHeight,
+        IReadOnlyList<string> labels,
+        float confidenceThreshold)
+    {
+        // Find outputs by name
+        Tensor<float>? boxesTensor = null;
+        Tensor<float>? logitsTensor = null;
+        Tensor<int>? classesTensor = null;
+
+        foreach (var r in results)
+        {
+            switch (r.Name)
+            {
+                case "boxes":
+                    boxesTensor = r.AsTensor<float>();
+                    break;
+                case "logits":
+                    logitsTensor = r.AsTensor<float>();
+                    break;
+                case "classes":
+                    classesTensor = r.AsTensor<int>();
+                    break;
+            }
+        }
+
+        if (boxesTensor == null || logitsTensor == null || classesTensor == null)
+            return [];
+
+        var predictions = new List<Prediction>();
+        int numDetections = logitsTensor.Dimensions[1]; // 300
+
+        for (int i = 0; i < numDetections; i++)
+        {
+            float score = logitsTensor[0, i];
+            if (score < confidenceThreshold) continue;
+
+            int classIdx = classesTensor[0, i];
+            string label = classIdx >= 0 && classIdx < labels.Count ? labels[classIdx] : $"class_{classIdx}";
+
+            // Boxes are [cx, cy, w, h] in input (560×560) coordinates
+            float cx = boxesTensor[0, i, 0];
+            float cy = boxesTensor[0, i, 1];
+            float bw = boxesTensor[0, i, 2];
+            float bh = boxesTensor[0, i, 3];
+
+            float xmin = cx - bw / 2f;
+            float ymin = cy - bh / 2f;
+            float xmax = cx + bw / 2f;
+            float ymax = cy + bh / 2f;
+
+            // Undo letterbox to get original image coordinates
+            var box = letterbox.UndoOnBox(xmin, ymin, xmax, ymax);
+
+            predictions.Add(new Prediction
+            {
+                Box = box,
+                Label = label,
+                Confidence = score,
+            });
+        }
+
+        return predictions;
+    }
 }

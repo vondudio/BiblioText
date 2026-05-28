@@ -57,6 +57,7 @@
          exports (yolo26n.onnx, yolo26m.onnx, ...) are picked up automatically.
          See scripts\download-models.ps1. -->
     <Content Include="Models\*.onnx" />
+    <Content Include="Models\*.data" />
   </ItemGroup>
   <!--
     Defining the "HasPackageAndPublishMenuAddedByProject" property here allows the Solution

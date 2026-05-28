@@ -46,6 +46,7 @@ GeneratedAppxManifest.xml
 #  - YOLO26 weights are AGPL-3.0 (Ultralytics). Users fetch them via
 #    scripts\download-models.ps1 (HF mirror) or export from .pt themselves.
 Models/*.onnx
+Models/*.data
 Models/*.CPU.onnx
 Models/*.NPU.onnx
 Models/*.GPU.onnx
@@ -66,3 +67,4 @@ Desktop.ini
 
 # Reference samples
 Select_Text_From_ImageSample/
+EXTRA/

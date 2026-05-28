@@ -12,6 +12,7 @@ internal enum ModelHead
     Yolo26EndToEnd,
     Yolo26OneToMany,
     Yolo26Segmentation,
+    RfDetr,
 }
 
 internal enum TensorLayout
@@ -34,8 +35,18 @@ internal sealed record ModelInfo(
     public string GetFullPath(string modelsDirectory) =>
         Path.Combine(modelsDirectory, FileName);
 
-    public bool ExistsIn(string modelsDirectory) =>
-        File.Exists(GetFullPath(modelsDirectory));
+    public bool ExistsIn(string modelsDirectory)
+    {
+        string path = GetFullPath(modelsDirectory);
+        if (!File.Exists(path)) return false;
+        // RF-DETR uses external data file — both must be present
+        if (Head == ModelHead.RfDetr)
+        {
+            string dataPath = Path.ChangeExtension(path, ".data");
+            return File.Exists(dataPath);
+        }
+        return true;
+    }
 }
 
 internal static class ModelRegistry
@@ -177,6 +188,18 @@ internal static class ModelRegistry
             Layout: TensorLayout.Nchw,
             Labels: CocoLabels.Labels,
             DefaultConfidence: 0.45f),
+
+        // -------- RF-DETR (transformer-based, 560×560) --------
+        new ModelInfo(
+            Id: "rf-detr",
+            DisplayName: "RF-DETR (transformer, 560)",
+            FileName: "rf_detr.onnx",
+            Head: ModelHead.RfDetr,
+            InputWidth: 560,
+            InputHeight: 560,
+            Layout: TensorLayout.Nchw,
+            Labels: CocoLabels.Labels,
+            DefaultConfidence: 0.50f),
     ];
 
     public static IReadOnlyList<ModelInfo> Available(string modelsDirectory) =>
