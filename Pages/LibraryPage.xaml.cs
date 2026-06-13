@@ -1,6 +1,8 @@
+using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
 using System;
 using System.Collections.Generic;
@@ -9,6 +11,7 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Windows.UI;
 using BiblioText.Models;
 using BiblioText.Persistence;
 
@@ -495,6 +498,8 @@ internal sealed class BookDisplay
         {
             CoverImage = new BitmapImage(CoverImageUri);
         }
+
+        ProviderBadges = BuildProviderBadges(DescriptionSourcesJson);
     }
 
     public int Id { get; }
@@ -522,6 +527,7 @@ internal sealed class BookDisplay
     public Uri? CoverImageUri { get; }
     public BitmapImage? CoverImage { get; }
     public Visibility CoverVisibility => CoverImage != null ? Visibility.Visible : Visibility.Collapsed;
+    public IReadOnlyList<ProviderBadge> ProviderBadges { get; }
     public string LocationName { get; }
     public string LocationDisplay => string.IsNullOrEmpty(LocationName) ? "" : $"📍 {LocationName}";
     public bool IsDuplicate { get; }
@@ -583,6 +589,71 @@ internal sealed class BookDisplay
             return null;
         }
     }
+
+    private static IReadOnlyList<ProviderBadge> BuildProviderBadges(string? sourcesJson)
+    {
+        if (string.IsNullOrWhiteSpace(sourcesJson))
+        {
+            return Array.Empty<ProviderBadge>();
+        }
+
+        try
+        {
+            var sources = JsonSerializer.Deserialize<List<DescriptionSourceDisplay>>(sourcesJson);
+            if (sources == null || sources.Count == 0)
+            {
+                return Array.Empty<ProviderBadge>();
+            }
+
+            // Distinct by provider name, preserving first-seen order, so each provider only renders one chip.
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var badges = new List<ProviderBadge>();
+            foreach (var source in sources)
+            {
+                if (string.IsNullOrWhiteSpace(source.Provider)) continue;
+                if (!seen.Add(source.Provider)) continue;
+
+                var badge = ProviderBadge.ForProvider(source.Provider);
+                if (badge != null)
+                {
+                    badges.Add(badge);
+                }
+            }
+
+            return badges;
+        }
+        catch (JsonException)
+        {
+            return Array.Empty<ProviderBadge>();
+        }
+    }
+}
+
+internal sealed class ProviderBadge
+{
+    private ProviderBadge(string code, string tooltip, Color background)
+    {
+        Code = code;
+        ToolTip = tooltip;
+        Background = new SolidColorBrush(background);
+    }
+
+    public string Code { get; }
+    public string ToolTip { get; }
+    public SolidColorBrush Background { get; }
+
+    public static ProviderBadge? ForProvider(string provider) => provider switch
+    {
+        var p when p.Equals("Google Books", StringComparison.OrdinalIgnoreCase) =>
+            new ProviderBadge("G", "Google Books", Color.FromArgb(0xFF, 0x1A, 0x73, 0xE8)),
+        var p when p.Equals("Wikipedia", StringComparison.OrdinalIgnoreCase) =>
+            new ProviderBadge("W", "Wikipedia", Color.FromArgb(0xFF, 0x4B, 0x55, 0x63)),
+        var p when p.Equals("Open Library", StringComparison.OrdinalIgnoreCase) =>
+            new ProviderBadge("OL", "Open Library", Color.FromArgb(0xFF, 0xA4, 0x75, 0x51)),
+        var p when p.Equals("AI", StringComparison.OrdinalIgnoreCase) =>
+            new ProviderBadge("AI", "Generated from model knowledge (no external source)", Color.FromArgb(0xFF, 0x8B, 0x5C, 0xF6)),
+        _ => null
+    };
 }
 
 internal sealed class DescriptionSourceDisplay

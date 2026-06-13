@@ -51,14 +51,16 @@ internal sealed class BookDescriptionService
             ? """
                 You are a careful book reference assistant. Given a list of books and source snippets,
                 return a JSON object with descriptions for each book.
-                 
+
                 For each book provide:
                 - "short_description": 1-2 sentences describing what the book is about
                 - "long_description": A concise summary paragraph (3-5 sentences) covering the book's main themes, content, and significance
-                 
-                Use only the supplied source snippets for factual claims. If no sources are supplied,
-                or the supplied sources do not appear to match the requested title and author,
-                set both description fields to "Description unavailable".
+
+                When source snippets are supplied for a book, use ONLY those snippets for factual claims.
+                When a book is marked "no sources — use model knowledge", draw on your training data to
+                produce the best available description. Be conservative and avoid speculation; if you
+                genuinely don't recognize the title and author, set both description fields to
+                "Description unavailable".
                 """
             : settings.BookDescriptionPrompt;
 
@@ -71,7 +73,7 @@ internal sealed class BookDescriptionService
             var sources = metadataByBook[i];
             if (sources.Count == 0)
             {
-                sb.AppendLine("   Sources: none found");
+                sb.AppendLine("   Sources: none found — use model knowledge");
             }
             else
             {
@@ -166,17 +168,44 @@ internal sealed class BookDescriptionService
                 int idx = desc.Index - 1; // 1-based to 0-based
                 if (idx >= 0 && idx < books.Count)
                 {
+                    var sources = metadataByBook[idx];
+                    var hasGroundedSources = sources.Count > 0;
+                    var descriptionUseful =
+                        !IsUnavailable(desc.ShortDescription) &&
+                        !IsUnavailable(desc.LongDescription);
+
+                    // For ungrounded responses (model knowledge only), synthesize an "AI"
+                    // pseudo-source so the Library UI can render an AI badge. This also lets the
+                    // user see at a glance that this entry wasn't backed by an external lookup.
+                    var sourcesForStorage = hasGroundedSources
+                        ? (object)sources
+                        : descriptionUseful
+                            ? new[]
+                            {
+                                new BookMetadataSource
+                                {
+                                    Provider = "AI",
+                                    Title = books[idx].Title,
+                                    Url = string.Empty,
+                                    Snippet = "Generated from model knowledge — not cross-referenced against an external source."
+                                }
+                            }
+                            : Array.Empty<BookMetadataSource>();
+
+                    string? sourcesJson = sourcesForStorage switch
+                    {
+                        IReadOnlyList<BookMetadataSource> list when list.Count > 0 =>
+                            JsonSerializer.Serialize(list),
+                        _ => null
+                    };
+
                     results.Add(new BookDescription
                     {
                         BookId = books[idx].BookId,
                         ShortDescription = desc.ShortDescription,
                         LongDescription = desc.LongDescription,
-                        IsGrounded = metadataByBook[idx].Count > 0 &&
-                            !IsUnavailable(desc.ShortDescription) &&
-                            !IsUnavailable(desc.LongDescription),
-                        SourcesJson = metadataByBook[idx].Count == 0
-                            ? null
-                            : JsonSerializer.Serialize(metadataByBook[idx]),
+                        IsGrounded = hasGroundedSources && descriptionUseful,
+                        SourcesJson = sourcesJson,
                         GeneratedAt = DateTime.UtcNow
                     });
                 }

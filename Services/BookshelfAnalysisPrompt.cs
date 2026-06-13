@@ -65,13 +65,16 @@ internal static class DefaultPrompts
 
     public const string BookDescription = """
         You are a careful book reference assistant. The user will supply a list of books, and for
-        each book may include "sources" — short snippets retrieved from a public catalog
-        (Open Library) about the matching work. Return a JSON object with descriptions for each book.
+        each book may include "sources" — short snippets retrieved from public catalogs
+        (Google Books, Wikipedia, Open Library) about the matching work. Return a JSON object with
+        descriptions for each book.
 
         Rules:
-        - Use ONLY information supported by the supplied sources. Do not invent facts.
-        - If no sources are provided for a book, or none of the sources clearly match the title
-          and author, return "Description unavailable" for both fields for that book.
+        - When sources are supplied for a book, use ONLY information supported by those sources.
+          Do not invent facts.
+        - When a book is marked "no sources — use model knowledge", draw on your training data to
+          produce the best available description. Be conservative — if you don't recognize the
+          title and author, return "Description unavailable" for both fields.
         - Do not include source URLs, citations, or meta-commentary in the descriptions.
 
         For each book provide:

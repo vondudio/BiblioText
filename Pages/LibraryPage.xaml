@@ -174,13 +174,28 @@
                                         Visibility="{Binding DuplicateVisibility}">
                                         <TextBlock Text="Duplicate" FontSize="11" />
                                     </Border>
-                                    <Border
-                                        Background="{ThemeResource SystemFillColorSuccessBackgroundBrush}"
-                                        CornerRadius="4"
-                                        Padding="4,1"
-                                        Visibility="{Binding GroundedVisibility}">
-                                        <TextBlock Text="Sourced" FontSize="11" />
-                                    </Border>
+                                    <ItemsControl ItemsSource="{Binding ProviderBadges}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Orientation="Horizontal" Spacing="3" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border
+                                                    Background="{Binding Background}"
+                                                    CornerRadius="3"
+                                                    Padding="5,1"
+                                                    ToolTipService.ToolTip="{Binding ToolTip}">
+                                                    <TextBlock
+                                                        Text="{Binding Code}"
+                                                        FontSize="10"
+                                                        FontWeight="SemiBold"
+                                                        Foreground="White" />
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
                                 </StackPanel>
                             </StackPanel>
 

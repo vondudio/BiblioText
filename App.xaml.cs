@@ -29,9 +29,10 @@ public partial class App : Application
         services.AddSingleton<IReviewApplicationService, ReviewApplicationService>();
         services.AddSingleton<OpenLibraryBookMetadataLookupService>();
         services.AddSingleton<GoogleBooksMetadataLookupService>();
+        services.AddSingleton<WikipediaMetadataLookupService>();
         services.AddSingleton<IBookMetadataLookupService>(sp => new CompositeMetadataLookupService(
             sp.GetRequiredService<GoogleBooksMetadataLookupService>(),
-            sp.GetRequiredService<OpenLibraryBookMetadataLookupService>()));
+            sp.GetRequiredService<WikipediaMetadataLookupService>()));
         services.AddSingleton<BookDescriptionService>();
         services.AddSingleton<SemanticSearchService>();
         Services = services.BuildServiceProvider();
