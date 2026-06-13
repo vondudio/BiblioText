@@ -2081,7 +2081,11 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         if (!_isDrawing || _drawRect == null) return;
         if (e.Pointer.PointerId != _drawPointerId) return;
 
-        BoxOverlay.ReleasePointerCapture(e.Pointer);
+        // Commit BEFORE the system tears the pointer capture down — calling
+        // ReleasePointerCapture here would fire PointerCaptureLost synchronously,
+        // which would treat this as a cancellation and discard the box. The
+        // system auto-releases capture on pointer-up; the late CaptureLost
+        // handler sees _isDrawing == false and no-ops.
         FinishDrawing(commit: true);
         e.Handled = true;
     }
