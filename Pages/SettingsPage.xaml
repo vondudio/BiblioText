@@ -70,11 +70,24 @@
                     IsClosable="True" />
             </StackPanel>
 
+            <!-- Book Metadata Providers -->
+            <StackPanel Spacing="12">
+                <TextBlock Text="Book Metadata Providers" Style="{StaticResource SubtitleTextBlockStyle}" />
+                <TextBlock TextWrapping="Wrap" Opacity="0.7"
+                    Text="Book descriptions are grounded in real metadata. Google Books supplies publisher-quality descriptions but requires an API key (free from Google Cloud Console). Open Library is used as a fallback and needs no key." />
+
+                <PasswordBox
+                    x:Name="GoogleBooksKeyBox"
+                    Header="Google Books API Key (optional)"
+                    PlaceholderText="Paste your API key from console.cloud.google.com"
+                    AutomationProperties.Name="Google Books API key" />
+            </StackPanel>
+
             <!-- Info about env vars -->
             <StackPanel Spacing="8">
                 <TextBlock Text="Environment Variable Fallback" Style="{StaticResource BodyStrongTextBlockStyle}" />
                 <TextBlock TextWrapping="Wrap" Opacity="0.6" FontSize="12"
-                    Text="If no settings are saved above, the app will try these environment variables: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT, AZURE_OPENAI_API_VERSION" />
+                    Text="If no settings are saved above, the app will try these environment variables: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT, AZURE_OPENAI_API_VERSION, GOOGLE_BOOKS_API_KEY" />
             </StackPanel>
 
             <!-- Camera -->

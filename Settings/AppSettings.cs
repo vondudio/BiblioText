@@ -10,6 +10,8 @@ public sealed class AppSettings
     public string? ApiVersion { get; set; } = "2024-10-21";
     public bool UseCameraCapture { get; set; } = true;
 
+    public string? GoogleBooksApiKey { get; set; }
+
     // Editable prompts (null = use default)
     public string? SpineExtractionPrompt { get; set; }
     public string? BookshelfAnalysisSystemPrompt { get; set; }

@@ -489,6 +489,12 @@ internal sealed class BookDisplay
         {
             SpineImage = new BitmapImage(new Uri(SpineImagePath));
         }
+
+        CoverImageUri = ExtractCoverUri(DescriptionSourcesJson);
+        if (CoverImageUri != null)
+        {
+            CoverImage = new BitmapImage(CoverImageUri);
+        }
     }
 
     public int Id { get; }
@@ -513,6 +519,9 @@ internal sealed class BookDisplay
     public string? BookshelfImagePath { get; }
     public int? DetectionIndex { get; }
     public BitmapImage? SpineImage { get; }
+    public Uri? CoverImageUri { get; }
+    public BitmapImage? CoverImage { get; }
+    public Visibility CoverVisibility => CoverImage != null ? Visibility.Visible : Visibility.Collapsed;
     public string LocationName { get; }
     public string LocationDisplay => string.IsNullOrEmpty(LocationName) ? "" : $"📍 {LocationName}";
     public bool IsDuplicate { get; }
@@ -552,10 +561,33 @@ internal sealed class BookDisplay
             }
         }
     }
+
+    private static Uri? ExtractCoverUri(string? sourcesJson)
+    {
+        if (string.IsNullOrWhiteSpace(sourcesJson))
+        {
+            return null;
+        }
+
+        try
+        {
+            var sources = JsonSerializer.Deserialize<List<DescriptionSourceDisplay>>(sourcesJson);
+            var coverUrl = sources?
+                .Select(s => s.CoverUrl)
+                .FirstOrDefault(url => !string.IsNullOrWhiteSpace(url));
+
+            return Uri.TryCreate(coverUrl, UriKind.Absolute, out var uri) ? uri : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
 }
 
 internal sealed class DescriptionSourceDisplay
 {
     public string? Provider { get; set; }
     public string? Url { get; set; }
+    public string? CoverUrl { get; set; }
 }

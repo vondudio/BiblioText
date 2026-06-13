@@ -14,6 +14,7 @@ public sealed class EnvironmentSettingsStore : ISettingsStore
             AzureOpenAiApiKey = Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY"),
             AzureOpenAiDeployment = Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT"),
             ApiVersion = Environment.GetEnvironmentVariable("AZURE_OPENAI_API_VERSION") ?? "2024-10-21",
+            GoogleBooksApiKey = Environment.GetEnvironmentVariable("GOOGLE_BOOKS_API_KEY"),
         };
     }
 

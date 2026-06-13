@@ -42,6 +42,7 @@ public sealed partial class SettingsPage : Page
         DeploymentBox.Text = settings.AzureOpenAiDeployment ?? "";
         ApiVersionBox.Text = settings.ApiVersion ?? "2024-10-21";
         UseCameraToggle.IsOn = settings.UseCameraCapture;
+        GoogleBooksKeyBox.Password = settings.GoogleBooksApiKey ?? "";
 
         SpinePromptBox.Text = settings.SpineExtractionPrompt ?? Services.DefaultPrompts.SpineExtraction;
         BookshelfSystemPromptBox.Text = settings.BookshelfAnalysisSystemPrompt ?? Services.DefaultPrompts.BookshelfAnalysisSystem;
@@ -61,6 +62,7 @@ public sealed partial class SettingsPage : Page
             AzureOpenAiDeployment = DeploymentBox.Text.Trim(),
             ApiVersion = ApiVersionBox.Text.Trim(),
             UseCameraCapture = UseCameraToggle.IsOn,
+            GoogleBooksApiKey = NullIfEmpty(GoogleBooksKeyBox.Password),
             SpineExtractionPrompt = NullIfEmpty(SpinePromptBox.Text),
             BookshelfAnalysisSystemPrompt = NullIfEmpty(BookshelfSystemPromptBox.Text),
             BookshelfAnalysisUserPrompt = NullIfEmpty(BookshelfUserPromptBox.Text),
