@@ -1971,13 +1971,11 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         if (_overlayCache == null || _overlayCache.BoxPredictions.Count == 0)
         {
             DetectionCountText.Text = string.Empty;
-            SelectionCountText.Text = string.Empty;
             return;
         }
         int total = _overlayCache.BoxPredictions.Count(p => p?.Box != null);
         int selected = _overlayCache.BoxPredictions.Count(p => p?.Box != null && !p.IsExcluded);
-        DetectionCountText.Text = $"Detections: {total}";
-        SelectionCountText.Text = $"Selected: {selected}";
+        DetectionCountText.Text = $"Detections: {total}    Selected: {selected}";
     }
 
     private static (double Width, double Height) GetSourcePixelSize(BitmapImage img)
@@ -2030,12 +2028,22 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
 
     private void Box_PointerPressed(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
     {
-        // Pen with barrel held: skip toggle-exclusion so the event can bubble
-        // to BoxOverlay_PointerPressed (or the next PointerMoved transition)
-        // and start a new draw at the pen location.
+        if (sender is not Microsoft.UI.Xaml.Shapes.Rectangle rect) return;
+        if (rect.Tag is not Prediction p) return;
+
+        // Pen eraser tip: delete the box outright (not just deactivate).
         if (e.Pointer.PointerDeviceType == Microsoft.UI.Input.PointerDeviceType.Pen)
         {
             var penProps = e.GetCurrentPoint((UIElement)sender).Properties;
+            if (penProps.IsEraser)
+            {
+                DeletePrediction(p, rect);
+                e.Handled = true;
+                return;
+            }
+            // Pen with barrel held: skip toggle-exclusion so the event can bubble
+            // to BoxOverlay_PointerPressed (or the next PointerMoved transition)
+            // and start a new draw at the pen location.
             if (penProps.IsBarrelButtonPressed)
             {
                 return;
@@ -2044,12 +2052,20 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
 
         // Tap-to-toggle only — draw mode owns pointer interaction on the Canvas.
         if (_drawMode) return;
-        if (sender is not Microsoft.UI.Xaml.Shapes.Rectangle rect) return;
-        if (rect.Tag is not Prediction p) return;
         p.IsExcluded = !p.IsExcluded;
         ApplyExclusionVisual(rect, p.IsExcluded);
         UpdateDetectionCountLabel();
         e.Handled = true;
+    }
+
+    private void DeletePrediction(Prediction p, Microsoft.UI.Xaml.Shapes.Rectangle rect)
+    {
+        if (_overlayCache == null) return;
+        _overlayCache.BoxPredictions.Remove(p);
+        BoxOverlay.Children.Remove(rect);
+        ExtractButton.IsEnabled = _overlayCache.BoxPredictions.Count(x => !x.IsExcluded) > 0;
+        ScanStatusText.Text = $"Deleted box. Detections: {_overlayCache.BoxPredictions.Count}.";
+        UpdateDetectionCountLabel();
     }
 
     // ---------------- Draw-new-box mode ----------------

@@ -374,11 +374,14 @@ public sealed partial class LibraryPage : Page
         }
 
         // Size the scroller to the current window so the full text is always
-        // reachable, regardless of how long the description is.
+        // reachable, regardless of how long the description is. Horizontal
+        // fits the popup width; vertical scrolls when content exceeds the cap.
         var window = App.Window;
         var bounds = window?.Bounds;
-        var width = Math.Min(720.0, Math.Max(420.0, (bounds?.Width ?? 900) * 0.6));
-        var height = Math.Min(720.0, Math.Max(360.0, (bounds?.Height ?? 700) * 0.7));
+        var winWidth = bounds?.Width ?? 900;
+        var winHeight = bounds?.Height ?? 700;
+        var width = Math.Min(800.0, Math.Max(420.0, winWidth * 0.7));
+        var maxHeight = Math.Max(360.0, winHeight * 0.85);
 
         var scroller = new ScrollViewer
         {
@@ -386,22 +389,65 @@ public sealed partial class LibraryPage : Page
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
             VerticalScrollMode = ScrollMode.Enabled,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-            Width = width,
-            Height = height,
             Padding = new Thickness(4, 0, 12, 0),
             Content = stack
         };
 
-        var dialog = new ContentDialog
+        // Title header above the body
+        var titleBlock = new TextBlock
         {
-            Title = book.Title,
-            Content = scroller,
-            CloseButtonText = "Close",
-            DefaultButton = ContentDialogButton.Close,
-            XamlRoot = this.XamlRoot
+            Text = book.Title,
+            FontSize = 20,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            TextWrapping = TextWrapping.WrapWholeWords,
+            Margin = new Thickness(0, 0, 0, 12)
+        };
+        var popupBody = new StackPanel { Spacing = 0 };
+        popupBody.Children.Add(titleBlock);
+        popupBody.Children.Add(scroller);
+
+        var border = new Border
+        {
+            Background = (Brush)Application.Current.Resources["LayerFillColorDefaultBrush"],
+            BorderBrush = (Brush)Application.Current.Resources["SurfaceStrokeColorDefaultBrush"],
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(20),
+            Width = width,
+            MaxHeight = maxHeight,
+            Child = popupBody
         };
 
-        await dialog.ShowAsync();
+        var popup = new Microsoft.UI.Xaml.Controls.Primitives.Popup
+        {
+            XamlRoot = this.XamlRoot,
+            IsLightDismissEnabled = true,
+            LightDismissOverlayMode = LightDismissOverlayMode.On,
+            Child = border
+        };
+
+        // Close on tap anywhere inside the body as well (light-dismiss handles
+        // clicks on the dimmed overlay outside).
+        border.Tapped += (s, e) => popup.IsOpen = false;
+        scroller.Tapped += (s, e) => popup.IsOpen = false;
+
+        // Center on the XamlRoot.
+        void Reposition()
+        {
+            var rootSize = this.XamlRoot?.Size ?? new Windows.Foundation.Size(winWidth, winHeight);
+            border.Measure(new Windows.Foundation.Size(rootSize.Width, rootSize.Height));
+            var desired = border.DesiredSize;
+            popup.HorizontalOffset = Math.Max(0, (rootSize.Width - desired.Width) / 2.0);
+            popup.VerticalOffset = Math.Max(0, (rootSize.Height - desired.Height) / 2.0);
+        }
+        border.Loaded += (s, e) => Reposition();
+        if (this.XamlRoot != null)
+        {
+            this.XamlRoot.Changed += (s, e) => Reposition();
+        }
+
+        popup.IsOpen = true;
+        await Task.CompletedTask;
     }
 
     private static IEnumerable<string> SplitIntoParagraphs(string body)

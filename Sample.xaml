@@ -424,7 +424,6 @@
                 <StackPanel
                     Grid.Column="1"
                     Orientation="Horizontal"
-                    Spacing="12"
                     VerticalAlignment="Center"
                     Margin="12,0,0,0">
                     <TextBlock
@@ -433,14 +432,7 @@
                         Opacity="0.8"
                         VerticalAlignment="Center"
                         Text=""
-                        AutomationProperties.Name="Detection count" />
-                    <TextBlock
-                        x:Name="SelectionCountText"
-                        FontSize="12"
-                        Opacity="0.8"
-                        VerticalAlignment="Center"
-                        Text=""
-                        AutomationProperties.Name="Selection count" />
+                        AutomationProperties.Name="Detection and selection counts" />
                 </StackPanel>
             </Grid>
         </Border>
