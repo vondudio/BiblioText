@@ -48,20 +48,7 @@ internal sealed class BookDescriptionService
         var metadataByBook = await LookupMetadataAsync(books, ct);
 
         var systemPrompt = string.IsNullOrWhiteSpace(settings.BookDescriptionPrompt)
-            ? """
-                You are a careful book reference assistant. Given a list of books and source snippets,
-                return a JSON object with descriptions for each book.
-
-                For each book provide:
-                - "short_description": 1-2 sentences describing what the book is about
-                - "long_description": A concise summary paragraph (3-5 sentences) covering the book's main themes, content, and significance
-
-                When source snippets are supplied for a book, use ONLY those snippets for factual claims.
-                When a book is marked "no sources — use model knowledge", draw on your training data to
-                produce the best available description. Be conservative and avoid speculation; if you
-                genuinely don't recognize the title and author, set both description fields to
-                "Description unavailable".
-                """
+            ? Services.DefaultPrompts.BookDescription
             : settings.BookDescriptionPrompt;
 
         // Build the book list and retrieved source context for the prompt.
@@ -115,7 +102,7 @@ internal sealed class BookDescriptionService
                         """
                 }
             },
-            max_completion_tokens = 4096,
+            max_completion_tokens = 16384,
             temperature = 0.3,
             response_format = new { type = "json_object" }
         };

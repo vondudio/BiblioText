@@ -129,10 +129,14 @@ internal sealed class WikipediaMetadataLookupService : IBookMetadataLookupServic
 
     private async Task<string?> ResolveCanonicalTitleAsync(string title, string? author, CancellationToken ct)
     {
+        // The opensearch endpoint is a prefix matcher — concatenating "Title Author" frequently
+        // returns unrelated pages whose titles happen to share a token with the author's name
+        // (e.g. "Dune Herbert" -> "Don Herbert"). The action=query&list=search endpoint uses the
+        // Wikipedia full-text relevance ranker, which actually understands what we're asking for.
         var searchTerm = string.IsNullOrWhiteSpace(author) ? title : $"{title} {author}";
         var uri = new Uri(
-            "https://en.wikipedia.org/w/api.php?action=opensearch&format=json&limit=3" +
-            $"&search={Uri.EscapeDataString(searchTerm)}");
+            "https://en.wikipedia.org/w/api.php?action=query&list=search&format=json&srlimit=3" +
+            $"&srsearch={Uri.EscapeDataString(searchTerm)}");
 
         try
         {
@@ -144,19 +148,41 @@ internal sealed class WikipediaMetadataLookupService : IBookMetadataLookupServic
 
             await using var stream = await response.Content.ReadAsStreamAsync(ct);
             using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
-            // Response shape: [query, [titles], [descriptions], [urls]]
-            if (doc.RootElement.ValueKind != JsonValueKind.Array || doc.RootElement.GetArrayLength() < 2)
+            if (!doc.RootElement.TryGetProperty("query", out var queryElement) ||
+                !queryElement.TryGetProperty("search", out var searchElement) ||
+                searchElement.ValueKind != JsonValueKind.Array ||
+                searchElement.GetArrayLength() == 0)
             {
                 return null;
             }
 
-            var titles = doc.RootElement[1];
-            if (titles.ValueKind != JsonValueKind.Array || titles.GetArrayLength() == 0)
+            // Prefer the first result that explicitly mentions the title as a literary work
+            // (page title contains the requested title token, OR is suffixed like "(novel)"),
+            // otherwise fall back to the top relevance hit.
+            var normalizedTitle = NormalizeForCompare(title);
+            string? bestFallback = null;
+            foreach (var hit in searchElement.EnumerateArray())
             {
-                return null;
+                if (!hit.TryGetProperty("title", out var titleProp)) continue;
+                var pageTitle = titleProp.GetString();
+                if (string.IsNullOrWhiteSpace(pageTitle)) continue;
+
+                bestFallback ??= pageTitle;
+
+                var normalizedPage = NormalizeForCompare(pageTitle);
+                if (normalizedPage.Contains(normalizedTitle, StringComparison.Ordinal) &&
+                    (pageTitle.Contains("(novel)", StringComparison.OrdinalIgnoreCase) ||
+                     pageTitle.Contains("(book)", StringComparison.OrdinalIgnoreCase) ||
+                     pageTitle.Contains("(memoir)", StringComparison.OrdinalIgnoreCase) ||
+                     pageTitle.Contains("(play)", StringComparison.OrdinalIgnoreCase) ||
+                     pageTitle.Contains("(poem)", StringComparison.OrdinalIgnoreCase) ||
+                     normalizedPage == normalizedTitle))
+                {
+                    return pageTitle;
+                }
             }
 
-            return titles[0].GetString();
+            return bestFallback;
         }
         catch (HttpRequestException)
         {
@@ -171,6 +197,9 @@ internal sealed class WikipediaMetadataLookupService : IBookMetadataLookupServic
             return null;
         }
     }
+
+    private static string NormalizeForCompare(string value) =>
+        new(value.ToLowerInvariant().Where(c => char.IsLetterOrDigit(c) || c == ' ').ToArray());
 
     private async Task<WikipediaSummary?> FetchSummaryAsync(string canonicalTitle, CancellationToken ct)
     {
