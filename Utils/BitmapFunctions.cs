@@ -375,15 +375,22 @@ internal class BitmapFunctions
         return input;
     }
 
+    /// <summary>
+    /// Encodes the source bitmap to a BitmapImage suitable for XAML display.
+    /// Bounding boxes are no longer baked into the pixels — the scan pane draws
+    /// them as a XAML overlay so they can be clicked, deselected, or augmented
+    /// with user-drawn boxes.
+    /// </summary>
     public static BitmapImage RenderPredictions(Bitmap image, List<Prediction> predictions)
     {
-        DrawPredictions(image, predictions);
+        _ = predictions; // kept for signature compatibility; overlay handles boxes
         return EncodeBitmapToBitmapImage(image);
     }
 
     /// <summary>
-    /// Renders numbered bounding boxes onto a copy of the image and returns JPEG bytes.
-    /// The original image is not modified.
+    /// Renders rectangle-only bounding boxes onto a copy of the image and returns
+    /// JPEG bytes. Used to give the AI a visual reference for which spines were
+    /// detected; labels and confidence values are intentionally omitted.
     /// </summary>
     public static byte[] RenderAnnotatedJpeg(Bitmap sourceImage, IReadOnlyList<Prediction> predictions)
     {
@@ -395,8 +402,9 @@ internal class BitmapFunctions
     }
 
     /// <summary>
-    /// Renders YOLO26-seg results: paints translucent class-colored masks over the
-    /// pixels they cover, then draws the bounding-box rectangles + labels on top.
+    /// Renders YOLO26-seg results: paints translucent class-colored masks over
+    /// the pixels they cover. Rectangles are not baked — the scan pane's XAML
+    /// overlay draws them on top so they remain interactive.
     /// </summary>
     public static BitmapImage RenderMaskedPredictions(Bitmap image, List<MaskedPrediction> masked, float maskAlpha = 0.4f)
     {
@@ -404,8 +412,6 @@ internal class BitmapFunctions
         {
             PaintMaskOverlay(image, masked, maskAlpha);
         }
-        var asPredictions = masked.ConvertAll(m => m.ToPrediction());
-        DrawPredictions(image, asPredictions);
         return EncodeBitmapToBitmapImage(image);
     }
 
@@ -414,9 +420,6 @@ internal class BitmapFunctions
         using Graphics g = Graphics.FromImage(image);
         float markerSize = (image.Width + image.Height) * 0.001f;
         using Pen pen = new(Color.Red, markerSize);
-        using Brush brush = new SolidBrush(Color.White);
-        using Brush bgBrush = new SolidBrush(Color.FromArgb(180, 0, 0, 0));
-        using Font font = new("Arial", GetAdjustedFontsize(predictions));
         foreach (var p in predictions)
         {
             if (p == null || p.Box == null)
@@ -427,9 +430,6 @@ internal class BitmapFunctions
             g.DrawLine(pen, p.Box.Xmax, p.Box.Ymin, p.Box.Xmax, p.Box.Ymax);
             g.DrawLine(pen, p.Box.Xmax, p.Box.Ymax, p.Box.Xmin, p.Box.Ymax);
             g.DrawLine(pen, p.Box.Xmin, p.Box.Ymax, p.Box.Xmin, p.Box.Ymin);
-
-            string labelText = $"{p.Label}, {p.Confidence:0.00}";
-            g.DrawString(labelText, font, brush, new PointF(p.Box.Xmin, p.Box.Ymax + 2));
         }
     }
 
@@ -689,19 +689,5 @@ internal class BitmapFunctions
         bitmapImage.SetSource(stream);
 
         return bitmapImage;
-    }
-
-    private static float GetAdjustedFontsize(List<Prediction> predictions)
-    {
-        float adjustedFontSize = 12;
-
-        if (predictions.Count > 0)
-        {
-            int maxPredictionTextLength = predictions.Select(p => p.Label.Length).ToList().Max() + 5;
-            float minPredictionBoxWidth = predictions.Select(p => p.Box!.Xmax - p.Box!.Xmin).ToList().Min();
-            adjustedFontSize = Math.Clamp(minPredictionBoxWidth / ((float)maxPredictionTextLength), 8, 16);
-        }
-
-        return adjustedFontSize;
     }
 }

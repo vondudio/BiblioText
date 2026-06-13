@@ -44,6 +44,7 @@
                     Height="{Binding ViewportHeight, ElementName=ImageScroller}">
                     <Grid>
                         <Image x:Name="DefaultImage" />
+                        <Canvas x:Name="BoxOverlay" Background="Transparent" />
                         <Canvas x:Name="OcrOverlay" Visibility="Collapsed" />
                     </Grid>
                 </Viewbox>
@@ -148,6 +149,16 @@
                             VerticalAlignment="Center">
                             <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE8F2;" FontSize="14" />
                         </Button>
+                        <ToggleButton
+                            x:Name="DrawBoxButton"
+                            Checked="DrawBoxButton_Checked"
+                            Unchecked="DrawBoxButton_Unchecked"
+                            ToolTipService.ToolTip="Draw a bounding box on the image (one box, then exits)"
+                            Padding="6,4"
+                            VerticalAlignment="Center"
+                            AutomationProperties.Name="Draw a bounding box">
+                            <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE91B;" FontSize="14" />
+                        </ToggleButton>
                     </StackPanel>
                 </StackPanel>
             </Grid>

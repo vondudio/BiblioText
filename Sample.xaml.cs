@@ -79,6 +79,23 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
     private double _panStartOffsetY;
     private uint _panPointerId;
 
+    // ---------------- Box overlay (clickable detections + user-drawn box) ----------------
+    //
+    // BoxOverlay is a Canvas sized to source-image pixel dimensions, sitting in
+    // the same Viewbox as DefaultImage so it scales with zoom/pan. Each
+    // detection becomes a Rectangle child whose Tag points back to its
+    // Prediction; tapping toggles IsExcluded. When DrawBoxButton is checked,
+    // the Canvas captures pointer events to rubber-band a new Rectangle, which
+    // on release becomes a Prediction with IsManual=true.
+    private bool _drawMode;
+    private bool _isDrawing;
+    private uint _drawPointerId;
+    private Windows.Foundation.Point _drawStart;
+    private Microsoft.UI.Xaml.Shapes.Rectangle? _drawRect;
+    private CachedOutput? _overlayCache; // the cache entry currently rendered in BoxOverlay
+    private double _overlayImageWidth;
+    private double _overlayImageHeight;
+
     public Sample()
     {
         this.InitializeComponent();
@@ -144,6 +161,14 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
             PointerCaptureLostEvent,
             new Microsoft.UI.Xaml.Input.PointerEventHandler(ImageScroller_PointerCaptureLost),
             handledEventsToo: true);
+
+        // BoxOverlay receives draw-mode pointer events directly. When draw mode
+        // is off the Canvas just hosts hit-testable Rectangle children for
+        // tap-to-deselect; these handlers no-op in that case.
+        BoxOverlay.PointerPressed += BoxOverlay_PointerPressed;
+        BoxOverlay.PointerMoved += BoxOverlay_PointerMoved;
+        BoxOverlay.PointerReleased += BoxOverlay_PointerReleased;
+        BoxOverlay.PointerCaptureLost += BoxOverlay_PointerCaptureLost;
     }
 
     private void Page_Loaded()
@@ -318,11 +343,13 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
             }
 
             // Always swap to the pristine source first so any stale boxes from a previous
-            // render disappear instantly.
+            // render disappear instantly. Clear the overlay too — a fresh cache hit /
+            // detection will rebuild it.
             if (item.SourceImage != null)
             {
                 DefaultImage.Source = item.SourceImage;
             }
+            ClearBoxOverlay();
 
             if (_inferenceSession == null || _currentModel == null)
             {
@@ -334,6 +361,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
             if (!forceRerun && item.Outputs.TryGetValue(cacheKey, out CachedOutput? cached))
             {
                 DefaultImage.Source = cached.Image;
+                RefreshBoxOverlay(cached);
                 StatusText.Text = $"(cached) model={_currentModel.Id}  conf={ConfidenceSlider.Value:F2}  detections={cached.BoxPredictions.Count}";
                 StatusBar.Visibility = Visibility.Visible;
                 ExtractButton.IsEnabled = cached.BoxPredictions.Count > 0;
@@ -809,6 +837,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         if (_images.Count == 0)
         {
             DefaultImage.Source = null;
+            ClearBoxOverlay();
             StatusText.Text = string.Empty;
             StatusBar.Visibility = Visibility.Collapsed;
             RemoveButton.IsEnabled = false;
@@ -836,25 +865,39 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         }
         var item = _activeImage;
 
-        // Use clip model (bounding boxes) for extraction, not the viewing model
-        ScanStatusText.Text = "Running clip model for extraction...";
+        // Use the bounding boxes the user actually sees in the overlay — including
+        // their manual additions and minus anything they deselected — instead of
+        // re-running a separate clip model. Falls back to the clip model only if
+        // detection hasn't been cached yet.
+        ScanStatusText.Text = "Preparing crops for extraction...";
         var sourceBitmap = item.SourceBitmap;
         float confidence = (float)ConfidenceSlider.Value;
 
         List<Prediction> boxPredictions;
-        try
+        if (item.Outputs.TryGetValue(CacheKey(), out CachedOutput? cached) && cached.BoxPredictions.Count > 0)
         {
-            boxPredictions = await GetClipPredictionsAsync(sourceBitmap, confidence);
+            // Snapshot to avoid mutation while the async crop runs in the background.
+            boxPredictions = cached.BoxPredictions
+                .Where(p => !p.IsExcluded && p.Box != null)
+                .Select(p => new Prediction { Box = p.Box, Label = p.Label, Confidence = p.Confidence, IsManual = p.IsManual })
+                .ToList();
         }
-        catch (Exception ex)
+        else
         {
-            ScanStatusText.Text = $"Clip model error: {ex.Message}";
-            return;
+            try
+            {
+                boxPredictions = await GetClipPredictionsAsync(sourceBitmap, confidence);
+            }
+            catch (Exception ex)
+            {
+                ScanStatusText.Text = $"Clip model error: {ex.Message}";
+                return;
+            }
         }
 
         if (boxPredictions.Count == 0)
         {
-            ScanStatusText.Text = "No objects detected by clip model at current confidence.";
+            ScanStatusText.Text = "No boxes selected for extraction.";
             return;
         }
 
@@ -869,6 +912,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         if (_images.Count == 0)
         {
             DefaultImage.Source = null;
+            ClearBoxOverlay();
             StatusText.Text = string.Empty;
             StatusBar.Visibility = Visibility.Collapsed;
             RemoveButton.IsEnabled = false;
@@ -980,8 +1024,10 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
             return;
         }
 
-        // Use clip model (bounding boxes) for AI submission
-        ScanStatusText.Text = "Running clip model for AI analysis...";
+        // Use the bounding boxes the user actually sees in the overlay (minus
+        // deselected ones, plus manual ones) so the AI submission matches what
+        // the user reviewed. Fall back to clip model only if detection hasn't run.
+        ScanStatusText.Text = "Preparing image for AI analysis...";
         var sourceBitmap = _activeImage.SourceBitmap;
         float confidence = (float)ConfidenceSlider.Value;
         string filePath = _activeImage.FilePath ?? _activeImage.DisplayName;
@@ -990,13 +1036,23 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         List<BookCrop>? cropsList = null;
 
         List<Prediction> clipBoxes;
-        try
+        if (_activeImage.Outputs.TryGetValue(CacheKey(), out CachedOutput? aiCached) && aiCached.BoxPredictions.Count > 0)
         {
-            clipBoxes = await GetClipPredictionsAsync(sourceBitmap, confidence);
+            clipBoxes = aiCached.BoxPredictions
+                .Where(p => !p.IsExcluded && p.Box != null)
+                .Select(p => new Prediction { Box = p.Box, Label = p.Label, Confidence = p.Confidence, IsManual = p.IsManual })
+                .ToList();
         }
-        catch
+        else
         {
-            clipBoxes = [];
+            try
+            {
+                clipBoxes = await GetClipPredictionsAsync(sourceBitmap, confidence);
+            }
+            catch
+            {
+                clipBoxes = [];
+            }
         }
 
         if (clipBoxes.Count > 0)
@@ -1448,6 +1504,15 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
 
     private void ImageScroller_PointerPressed(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
     {
+        // Don't capture the pointer when the user is interacting with the box
+        // overlay — either to tap a detection rectangle or to rubber-band a new
+        // one. Without this guard, ScrollViewer pan capture (at zoom > 1) would
+        // swallow the press before the Rectangle's PointerPressed could fire.
+        if (_drawMode || IsInsideBoxOverlay(e.OriginalSource as DependencyObject))
+        {
+            return;
+        }
+
         if (ImageScroller.ZoomFactor <= 1.001f)
         {
             return;
@@ -1469,6 +1534,19 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         _panStartOffsetY = ImageScroller.VerticalOffset;
         _panPointerId = e.Pointer.PointerId;
         e.Handled = true;
+    }
+
+    private bool IsInsideBoxOverlay(DependencyObject? src)
+    {
+        while (src != null)
+        {
+            if (src == BoxOverlay)
+            {
+                return true;
+            }
+            src = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetParent(src);
+        }
+        return false;
     }
 
     private void ImageScroller_PointerMoved(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
@@ -1689,19 +1767,23 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
             throw;
         }
 
-        item.Outputs[cacheKey] = new CachedOutput
+        var cachedOutput = new CachedOutput
         {
             Image = outputImage,
             BoxPredictions = detectionResult.Box,
             MaskedPredictions = detectionResult.Mask,
         };
+        item.Outputs[cacheKey] = cachedOutput;
 
         DispatcherQueue.TryEnqueue(() =>
         {
-            // Only swap if the user hasn't switched to a different image meanwhile.
-            if (_activeImage == item)
+            // Only swap if the user hasn't switched to a different image meanwhile
+            // and the active cache key still matches (guard against a stale
+            // late-arriving detection from a previous model/confidence).
+            if (_activeImage == item && CacheKey() == cacheKey)
             {
                 DefaultImage.Source = outputImage;
+                RefreshBoxOverlay(cachedOutput);
                 string segNote = detectionResult.Mask is { Count: > 0 } ? "  (seg)" : string.Empty;
                 StatusText.Text =
                     $"{detectionCount} detection{(detectionCount == 1 ? string.Empty : "s")}{segNote}  •  " +
@@ -1790,5 +1872,236 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
                 };
             }
         });
+    }
+
+    // ---------------- Box overlay rendering ----------------
+
+    private static readonly Microsoft.UI.Xaml.Media.SolidColorBrush BoxStrokeBrush =
+        new(Windows.UI.Color.FromArgb(255, 230, 60, 60));
+    private static readonly Microsoft.UI.Xaml.Media.SolidColorBrush ManualStrokeBrush =
+        new(Windows.UI.Color.FromArgb(255, 60, 180, 230));
+
+    private void ClearBoxOverlay()
+    {
+        BoxOverlay.Children.Clear();
+        _overlayCache = null;
+        _overlayImageWidth = 0;
+        _overlayImageHeight = 0;
+        if (_drawMode)
+        {
+            // Cancel any in-progress drawing — the underlying image is gone.
+            _isDrawing = false;
+            _drawRect = null;
+            DrawBoxButton.IsChecked = false;
+        }
+    }
+
+    private void RefreshBoxOverlay(CachedOutput cached)
+    {
+        _overlayCache = cached;
+        var size = GetSourcePixelSize(cached.Image);
+        _overlayImageWidth = size.Width;
+        _overlayImageHeight = size.Height;
+        BoxOverlay.Width = _overlayImageWidth;
+        BoxOverlay.Height = _overlayImageHeight;
+        BoxOverlay.Children.Clear();
+
+        foreach (var p in cached.BoxPredictions)
+        {
+            if (p?.Box == null) continue;
+            var rect = BuildBoxRectangle(p);
+            BoxOverlay.Children.Add(rect);
+        }
+    }
+
+    private static (double Width, double Height) GetSourcePixelSize(BitmapImage img)
+    {
+        // BitmapImage exposes PixelWidth / PixelHeight after the source is decoded.
+        double w = img.PixelWidth > 0 ? img.PixelWidth : 0;
+        double h = img.PixelHeight > 0 ? img.PixelHeight : 0;
+        return (w, h);
+    }
+
+    private Microsoft.UI.Xaml.Shapes.Rectangle BuildBoxRectangle(Prediction p)
+    {
+        var box = p.Box!;
+        // Stroke thickness scales with image size so it stays visible at any zoom.
+        double thickness = Math.Max(2.0, (_overlayImageWidth + _overlayImageHeight) * 0.0015);
+        var rect = new Microsoft.UI.Xaml.Shapes.Rectangle
+        {
+            Width = Math.Max(1, box.Xmax - box.Xmin),
+            Height = Math.Max(1, box.Ymax - box.Ymin),
+            Stroke = p.IsManual ? ManualStrokeBrush : BoxStrokeBrush,
+            StrokeThickness = thickness,
+            Fill = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(0, 0, 0, 0)),
+            Tag = p,
+        };
+        ApplyExclusionVisual(rect, p.IsExcluded);
+        Canvas.SetLeft(rect, box.Xmin);
+        Canvas.SetTop(rect, box.Ymin);
+        rect.PointerPressed += Box_PointerPressed;
+        return rect;
+    }
+
+    private static void ApplyExclusionVisual(Microsoft.UI.Xaml.Shapes.Rectangle rect, bool excluded)
+    {
+        if (excluded)
+        {
+            rect.StrokeDashArray = new Microsoft.UI.Xaml.Media.DoubleCollection { 4, 2 };
+            rect.Opacity = 0.3;
+        }
+        else
+        {
+            rect.StrokeDashArray = null;
+            rect.Opacity = 1.0;
+        }
+    }
+
+    private void Box_PointerPressed(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        // Tap-to-toggle only — draw mode owns pointer interaction on the Canvas.
+        if (_drawMode) return;
+        if (sender is not Microsoft.UI.Xaml.Shapes.Rectangle rect) return;
+        if (rect.Tag is not Prediction p) return;
+        p.IsExcluded = !p.IsExcluded;
+        ApplyExclusionVisual(rect, p.IsExcluded);
+        e.Handled = true;
+    }
+
+    // ---------------- Draw-new-box mode ----------------
+
+    private void DrawBoxButton_Checked(object sender, RoutedEventArgs e)
+    {
+        _drawMode = true;
+        ScanStatusText.Text = "Draw mode: drag on the image to add a bounding box.";
+    }
+
+    private void DrawBoxButton_Unchecked(object sender, RoutedEventArgs e)
+    {
+        _drawMode = false;
+        if (_isDrawing && _drawRect != null)
+        {
+            BoxOverlay.Children.Remove(_drawRect);
+        }
+        _isDrawing = false;
+        _drawRect = null;
+        ScanStatusText.Text = "Draw mode off.";
+    }
+
+    private void BoxOverlay_PointerPressed(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        if (!_drawMode) return;
+        if (_overlayCache == null) return;
+        // Ignore clicks that originate on an existing box — let Box_PointerPressed
+        // run instead (which no-ops in draw mode, but we still don't want to start
+        // a draw with a rubber-band that includes their click).
+        if (e.OriginalSource is Microsoft.UI.Xaml.Shapes.Rectangle r && r != _drawRect)
+        {
+            return;
+        }
+
+        var pt = e.GetCurrentPoint(BoxOverlay);
+        if (!pt.Properties.IsLeftButtonPressed) return;
+
+        if (!BoxOverlay.CapturePointer(e.Pointer)) return;
+
+        _isDrawing = true;
+        _drawPointerId = e.Pointer.PointerId;
+        _drawStart = pt.Position;
+
+        double thickness = Math.Max(2.0, (_overlayImageWidth + _overlayImageHeight) * 0.0015);
+        _drawRect = new Microsoft.UI.Xaml.Shapes.Rectangle
+        {
+            Stroke = ManualStrokeBrush,
+            StrokeThickness = thickness,
+            StrokeDashArray = new Microsoft.UI.Xaml.Media.DoubleCollection { 6, 3 },
+            Fill = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(40, 60, 180, 230)),
+            Width = 1,
+            Height = 1,
+        };
+        Canvas.SetLeft(_drawRect, _drawStart.X);
+        Canvas.SetTop(_drawRect, _drawStart.Y);
+        BoxOverlay.Children.Add(_drawRect);
+        e.Handled = true;
+    }
+
+    private void BoxOverlay_PointerMoved(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        if (!_isDrawing || _drawRect == null) return;
+        if (e.Pointer.PointerId != _drawPointerId) return;
+
+        var pos = e.GetCurrentPoint(BoxOverlay).Position;
+        double x = Math.Max(0, Math.Min(_overlayImageWidth, pos.X));
+        double y = Math.Max(0, Math.Min(_overlayImageHeight, pos.Y));
+        double left = Math.Min(_drawStart.X, x);
+        double top = Math.Min(_drawStart.Y, y);
+        double width = Math.Abs(x - _drawStart.X);
+        double height = Math.Abs(y - _drawStart.Y);
+
+        Canvas.SetLeft(_drawRect, left);
+        Canvas.SetTop(_drawRect, top);
+        _drawRect.Width = Math.Max(1, width);
+        _drawRect.Height = Math.Max(1, height);
+        e.Handled = true;
+    }
+
+    private void BoxOverlay_PointerReleased(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        if (!_isDrawing || _drawRect == null) return;
+        if (e.Pointer.PointerId != _drawPointerId) return;
+
+        BoxOverlay.ReleasePointerCapture(e.Pointer);
+        FinishDrawing(commit: true);
+        e.Handled = true;
+    }
+
+    private void BoxOverlay_PointerCaptureLost(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        if (!_isDrawing) return;
+        FinishDrawing(commit: false);
+    }
+
+    private void FinishDrawing(bool commit)
+    {
+        var draft = _drawRect;
+        _isDrawing = false;
+        _drawRect = null;
+
+        if (draft == null) return;
+        BoxOverlay.Children.Remove(draft);
+
+        if (!commit || _overlayCache == null)
+        {
+            DrawBoxButton.IsChecked = false;
+            return;
+        }
+
+        double left = Canvas.GetLeft(draft);
+        double top = Canvas.GetTop(draft);
+        double right = left + draft.Width;
+        double bottom = top + draft.Height;
+
+        // Require at least an 8x8 box to count as a real draw, otherwise discard
+        // — a stray click shouldn't become a permanent invisible prediction.
+        if (draft.Width < 8 || draft.Height < 8)
+        {
+            ScanStatusText.Text = "Draw cancelled (box too small).";
+            DrawBoxButton.IsChecked = false;
+            return;
+        }
+
+        var manual = new Prediction
+        {
+            Box = new Box((float)left, (float)top, (float)right, (float)bottom),
+            Label = "manual",
+            Confidence = 1.0f,
+            IsManual = true,
+        };
+        _overlayCache.BoxPredictions.Add(manual);
+        var rect = BuildBoxRectangle(manual);
+        BoxOverlay.Children.Add(rect);
+        ExtractButton.IsEnabled = _overlayCache.BoxPredictions.Count(p => !p.IsExcluded) > 0;
+        ScanStatusText.Text = $"Added manual box. Detections: {_overlayCache.BoxPredictions.Count}.";
+        DrawBoxButton.IsChecked = false; // one-shot
     }
 }

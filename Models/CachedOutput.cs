@@ -13,6 +13,12 @@ namespace BiblioText.Models;
 internal sealed class CachedOutput
 {
     public required BitmapImage Image { get; init; }
-    public required IReadOnlyList<Prediction> BoxPredictions { get; init; }
+
+    /// <summary>
+    /// Mutable so the scan-pane overlay can toggle per-box exclusion in place
+    /// and append user-drawn boxes. Replaced wholesale when detection re-runs.
+    /// </summary>
+    public required List<Prediction> BoxPredictions { get; init; }
+
     public IReadOnlyList<MaskedPrediction>? MaskedPredictions { get; init; }
 }
