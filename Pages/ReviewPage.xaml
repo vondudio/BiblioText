@@ -77,6 +77,7 @@
                 Grid.Column="0"
                 SelectionMode="Multiple"
                 SelectionChanged="ReviewList_SelectionChanged"
+                KeyDown="ReviewList_KeyDown"
                 Visibility="Collapsed"
                 ContainerContentChanging="ReviewList_ContainerContentChanging">
                 <ListView.ItemTemplate>
@@ -227,8 +228,15 @@
                 Spacing="12">
                 <Button Content="Cancel Import" x:Name="CancelButton" Click="CancelButton_Click"
                         Visibility="Collapsed" />
+                <Button x:Name="SelectAllButton" Click="SelectAllButton_Click" IsEnabled="False"
+                        ToolTipService.ToolTip="Select all books (Ctrl+A)">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE762;" FontSize="14" />
+                        <TextBlock x:Name="SelectAllLabel" Text="Select All" />
+                    </StackPanel>
+                </Button>
                 <Button x:Name="DeleteSelectedButton" Click="DeleteSelectedButton_Click" IsEnabled="False"
-                        ToolTipService.ToolTip="Delete selected books from review">
+                        ToolTipService.ToolTip="Delete selected books from review (Delete)">
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE74D;" FontSize="14" />
                         <TextBlock Text="Delete" />

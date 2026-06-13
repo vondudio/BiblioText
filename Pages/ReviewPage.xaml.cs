@@ -25,6 +25,7 @@ public sealed partial class ReviewPage : Page
         this.InitializeComponent();
         this.NavigationCacheMode = Microsoft.UI.Xaml.Navigation.NavigationCacheMode.Required;
         ReviewList.ItemsSource = _candidates;
+        _candidates.CollectionChanged += (_, _) => UpdateSelectionButtons();
         LocationDropdown.ItemsSource = _locations;
         this.Loaded += ReviewPage_Loaded;
         this.Unloaded += ReviewPage_Unloaded;
@@ -206,14 +207,45 @@ public sealed partial class ReviewPage : Page
 
     private void ReviewList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        UpdateSelectionButtons();
+    }
+
+    private void UpdateSelectionButtons()
+    {
+        int total = _candidates.Count;
         int selected = ReviewList.SelectedItems.Count;
         DeleteSelectedButton.IsEnabled = selected > 0;
         SendToLibraryButton.IsEnabled = selected > 0;
+        SelectAllButton.IsEnabled = total > 0;
+        SelectAllLabel.Text = (total > 0 && selected == total) ? "Deselect All" : "Select All";
+    }
+
+    private void SelectAllButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_candidates.Count == 0) return;
+        if (ReviewList.SelectedItems.Count == _candidates.Count)
+        {
+            ReviewList.SelectedItems.Clear();
+        }
+        else
+        {
+            ReviewList.SelectAll();
+        }
+    }
+
+    private void ReviewList_KeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (e.Key == Windows.System.VirtualKey.Delete && ReviewList.SelectedItems.Count > 0)
+        {
+            DeleteSelectedButton_Click(sender, e);
+            e.Handled = true;
+        }
     }
 
     private void DeleteSelectedButton_Click(object sender, RoutedEventArgs e)
     {
         var toRemove = ReviewList.SelectedItems.OfType<ReviewCandidate>().ToList();
+        if (toRemove.Count == 0) return;
         foreach (var c in toRemove)
         {
             _candidates.Remove(c);
