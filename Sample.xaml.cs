@@ -95,6 +95,14 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
     private CachedOutput? _overlayCache; // the cache entry currently rendered in BoxOverlay
     private double _overlayImageWidth;
     private double _overlayImageHeight;
+    private DrawSource _drawSource = DrawSource.None;
+    // Pen-barrel hover tracking: hover-barrel may not produce PointerPressed, so
+    // we drive draw start/commit off rising/falling edges of IsBarrelButtonPressed
+    // observed in PointerMoved.
+    private bool _penBarrelPressed;
+    private uint _penPointerId;
+
+    private enum DrawSource { None, Toggle, PenBarrel }
 
     public Sample()
     {
@@ -182,6 +190,14 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         BoxOverlay.AddHandler(
             PointerCaptureLostEvent,
             new Microsoft.UI.Xaml.Input.PointerEventHandler(BoxOverlay_PointerCaptureLost),
+            handledEventsToo: true);
+        BoxOverlay.AddHandler(
+            PointerExitedEvent,
+            new Microsoft.UI.Xaml.Input.PointerEventHandler(BoxOverlay_PointerExited),
+            handledEventsToo: true);
+        BoxOverlay.AddHandler(
+            PointerCanceledEvent,
+            new Microsoft.UI.Xaml.Input.PointerEventHandler(BoxOverlay_PointerCanceled),
             handledEventsToo: true);
     }
 
@@ -1901,13 +1917,20 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         _overlayCache = null;
         _overlayImageWidth = 0;
         _overlayImageHeight = 0;
-        if (_drawMode)
+        // Cancel any in-progress draw regardless of source — the underlying
+        // image is gone, so neither toggle-mode nor pen-barrel mode can recover.
+        if (_isDrawing)
         {
-            // Cancel any in-progress drawing — the underlying image is gone.
             _isDrawing = false;
             _drawRect = null;
-            DrawBoxButton.IsChecked = false;
+            if (_drawSource == DrawSource.Toggle)
+            {
+                DrawBoxButton.IsChecked = false;
+            }
+            _drawSource = DrawSource.None;
         }
+        _penBarrelPressed = false;
+        _penPointerId = 0;
     }
 
     private void RefreshBoxOverlay(CachedOutput cached)
@@ -1990,6 +2013,18 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
 
     private void Box_PointerPressed(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
     {
+        // Pen with barrel held: skip toggle-exclusion so the event can bubble
+        // to BoxOverlay_PointerPressed (or the next PointerMoved transition)
+        // and start a new draw at the pen location.
+        if (e.Pointer.PointerDeviceType == Microsoft.UI.Input.PointerDeviceType.Pen)
+        {
+            var penProps = e.GetCurrentPoint((UIElement)sender).Properties;
+            if (penProps.IsBarrelButtonPressed)
+            {
+                return;
+            }
+        }
+
         // Tap-to-toggle only — draw mode owns pointer interaction on the Canvas.
         if (_drawMode) return;
         if (sender is not Microsoft.UI.Xaml.Shapes.Rectangle rect) return;
@@ -2010,19 +2045,82 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
     private void DrawBoxButton_Unchecked(object sender, RoutedEventArgs e)
     {
         _drawMode = false;
-        if (_isDrawing && _drawRect != null)
+        // Only tear down state if THIS source owns the in-progress draw —
+        // pen-barrel draws must survive the user toggling the button.
+        if (_isDrawing && _drawSource == DrawSource.Toggle && _drawRect != null)
         {
             BoxOverlay.Children.Remove(_drawRect);
+            _isDrawing = false;
+            _drawRect = null;
+            _drawSource = DrawSource.None;
         }
-        _isDrawing = false;
-        _drawRect = null;
         ScanStatusText.Text = "Draw mode off.";
+    }
+
+    private void StartDrawRect(Windows.Foundation.Point start)
+    {
+        double thickness = Math.Max(2.0, (_overlayImageWidth + _overlayImageHeight) * 0.0015);
+        _drawRect = new Microsoft.UI.Xaml.Shapes.Rectangle
+        {
+            Stroke = ManualStrokeBrush,
+            StrokeThickness = thickness,
+            StrokeDashArray = new Microsoft.UI.Xaml.Media.DoubleCollection { 6, 3 },
+            Fill = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(40, 60, 180, 230)),
+            Width = 1,
+            Height = 1,
+        };
+        Canvas.SetLeft(_drawRect, start.X);
+        Canvas.SetTop(_drawRect, start.Y);
+        BoxOverlay.Children.Add(_drawRect);
+    }
+
+    private bool TryStartPenBarrelDraw(Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        if (_isDrawing) return false;
+        if (_overlayCache == null) return false;
+        if (e.Pointer.PointerDeviceType != Microsoft.UI.Input.PointerDeviceType.Pen) return false;
+
+        var pt = e.GetCurrentPoint(BoxOverlay);
+        if (!pt.Properties.IsBarrelButtonPressed) return false;
+        // Pen tip touching screen is a normal click — don't piggyback a draw on it.
+        if (pt.Properties.IsLeftButtonPressed) return false;
+
+        _isDrawing = true;
+        _drawSource = DrawSource.PenBarrel;
+        _drawPointerId = e.Pointer.PointerId;
+        _penPointerId = e.Pointer.PointerId;
+        _penBarrelPressed = true;
+        _drawStart = pt.Position;
+        StartDrawRect(pt.Position);
+        // Capture is opportunistic for hover-only pen input — don't fail if it
+        // doesn't take. Hover PointerMoved keeps firing on the element below
+        // the pen anyway.
+        BoxOverlay.CapturePointer(e.Pointer);
+        ScanStatusText.Text = "Drawing box (release barrel button to commit)...";
+        e.Handled = true;
+        return true;
     }
 
     private void BoxOverlay_PointerPressed(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
     {
-        if (!_drawMode) return;
         if (_overlayCache == null) return;
+
+        // Re-entry guard — a second pointer press while a draw is in progress
+        // is ignored. Prevents tip-down during a pen-barrel hover-draw (or any
+        // secondary pointer) from corrupting _drawRect / _drawPointerId.
+        if (_isDrawing)
+        {
+            e.Handled = true;
+            return;
+        }
+
+        // Pen-barrel fast path: try this BEFORE the originalSource gate so a
+        // barrel press over an existing box starts a new draw rather than
+        // toggling exclusion (Box_PointerPressed already skips on barrel).
+        if (TryStartPenBarrelDraw(e)) return;
+
+        if (!_drawMode) return;
+
         // Ignore clicks that originate on an existing box — let Box_PointerPressed
         // run instead (which no-ops in draw mode, but we still don't want to start
         // a draw with a rubber-band that includes their click).
@@ -2037,27 +2135,56 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         if (!BoxOverlay.CapturePointer(e.Pointer)) return;
 
         _isDrawing = true;
+        _drawSource = DrawSource.Toggle;
         _drawPointerId = e.Pointer.PointerId;
         _drawStart = pt.Position;
-
-        double thickness = Math.Max(2.0, (_overlayImageWidth + _overlayImageHeight) * 0.0015);
-        _drawRect = new Microsoft.UI.Xaml.Shapes.Rectangle
-        {
-            Stroke = ManualStrokeBrush,
-            StrokeThickness = thickness,
-            StrokeDashArray = new Microsoft.UI.Xaml.Media.DoubleCollection { 6, 3 },
-            Fill = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(40, 60, 180, 230)),
-            Width = 1,
-            Height = 1,
-        };
-        Canvas.SetLeft(_drawRect, _drawStart.X);
-        Canvas.SetTop(_drawRect, _drawStart.Y);
-        BoxOverlay.Children.Add(_drawRect);
+        StartDrawRect(pt.Position);
         e.Handled = true;
     }
 
     private void BoxOverlay_PointerMoved(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
     {
+        // Pen barrel state machine — drives both START (rising edge) and COMMIT
+        // (falling edge) for pen-barrel mode, because hover-barrel doesn't
+        // reliably produce PointerPressed/Released on Surface Slim Pen.
+        if (e.Pointer.PointerDeviceType == Microsoft.UI.Input.PointerDeviceType.Pen && _overlayCache != null)
+        {
+            var ppen = e.GetCurrentPoint(BoxOverlay);
+            bool barrel = ppen.Properties.IsBarrelButtonPressed;
+            bool tipDown = ppen.Properties.IsLeftButtonPressed;
+
+            if (!_isDrawing && barrel && !tipDown && !_penBarrelPressed)
+            {
+                // Rising edge of barrel button while not drawing → start at current pen pos.
+                _isDrawing = true;
+                _drawSource = DrawSource.PenBarrel;
+                _drawPointerId = e.Pointer.PointerId;
+                _penPointerId = e.Pointer.PointerId;
+                _drawStart = ppen.Position;
+                StartDrawRect(ppen.Position);
+                BoxOverlay.CapturePointer(e.Pointer);
+                _penBarrelPressed = true;
+                ScanStatusText.Text = "Drawing box (release barrel button to commit)...";
+                e.Handled = true;
+                return;
+            }
+
+            if (_isDrawing && _drawSource == DrawSource.PenBarrel && e.Pointer.PointerId == _drawPointerId)
+            {
+                if (!barrel)
+                {
+                    // Falling edge mid-move → commit.
+                    _penBarrelPressed = false;
+                    FinishDrawing(commit: true);
+                    e.Handled = true;
+                    return;
+                }
+                // Fall through to common rubber-band update below.
+            }
+
+            _penBarrelPressed = barrel;
+        }
+
         if (!_isDrawing || _drawRect == null) return;
         if (e.Pointer.PointerId != _drawPointerId) return;
 
@@ -2081,6 +2208,19 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         if (!_isDrawing || _drawRect == null) return;
         if (e.Pointer.PointerId != _drawPointerId) return;
 
+        // For pen-barrel draws, PointerReleased also fires when the pen TIP
+        // lifts off the screen. Don't commit while the barrel button is still
+        // held — PointerMoved's falling-edge path or a later release will do it.
+        if (_drawSource == DrawSource.PenBarrel)
+        {
+            var props = e.GetCurrentPoint(BoxOverlay).Properties;
+            if (props.IsBarrelButtonPressed)
+            {
+                return;
+            }
+            _penBarrelPressed = false;
+        }
+
         // Commit BEFORE the system tears the pointer capture down — calling
         // ReleasePointerCapture here would fire PointerCaptureLost synchronously,
         // which would treat this as a cancellation and discard the box. The
@@ -2093,21 +2233,56 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
     private void BoxOverlay_PointerCaptureLost(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
     {
         if (!_isDrawing) return;
+        // Pen-barrel capture is opportunistic — hover PointerMoved keeps
+        // firing on the overlay even without capture, so don't treat capture
+        // loss as cancellation. PointerExited / PointerCanceled handle real
+        // pen-departed-overlay cases.
+        if (_drawSource == DrawSource.PenBarrel) return;
         FinishDrawing(commit: false);
+    }
+
+    private void BoxOverlay_PointerExited(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        // Pen left hover range mid pen-barrel draw → cancel (we can't track
+        // barrel-release once the pen is out of range).
+        if (_isDrawing && _drawSource == DrawSource.PenBarrel && e.Pointer.PointerId == _drawPointerId)
+        {
+            FinishDrawing(commit: false);
+        }
+        if (e.Pointer.PointerId == _penPointerId)
+        {
+            _penPointerId = 0;
+            _penBarrelPressed = false;
+        }
+    }
+
+    private void BoxOverlay_PointerCanceled(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        if (_isDrawing && e.Pointer.PointerId == _drawPointerId)
+        {
+            FinishDrawing(commit: false);
+        }
+        if (e.Pointer.PointerId == _penPointerId)
+        {
+            _penPointerId = 0;
+            _penBarrelPressed = false;
+        }
     }
 
     private void FinishDrawing(bool commit)
     {
         var draft = _drawRect;
+        var source = _drawSource;
         _isDrawing = false;
         _drawRect = null;
+        _drawSource = DrawSource.None;
 
         if (draft == null) return;
         BoxOverlay.Children.Remove(draft);
 
         if (!commit || _overlayCache == null)
         {
-            DrawBoxButton.IsChecked = false;
+            if (source == DrawSource.Toggle) DrawBoxButton.IsChecked = false;
             return;
         }
 
@@ -2121,7 +2296,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         if (draft.Width < 8 || draft.Height < 8)
         {
             ScanStatusText.Text = "Draw cancelled (box too small).";
-            DrawBoxButton.IsChecked = false;
+            if (source == DrawSource.Toggle) DrawBoxButton.IsChecked = false;
             return;
         }
 
@@ -2137,6 +2312,6 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         BoxOverlay.Children.Add(rect);
         ExtractButton.IsEnabled = _overlayCache.BoxPredictions.Count(p => !p.IsExcluded) > 0;
         ScanStatusText.Text = $"Added manual box. Detections: {_overlayCache.BoxPredictions.Count}.";
-        DrawBoxButton.IsChecked = false; // one-shot
+        if (source == DrawSource.Toggle) DrawBoxButton.IsChecked = false; // one-shot
     }
 }
