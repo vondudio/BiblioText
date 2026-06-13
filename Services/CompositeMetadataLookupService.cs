@@ -10,9 +10,10 @@ using System.Threading.Tasks;
 namespace BiblioText.Services;
 
 /// <summary>
-/// Tries a chain of metadata providers in order. Each provider's hits are returned, but the chain
-/// stops early as soon as a provider supplies a usable description, which is what
-/// <see cref="BookDescriptionService"/> actually needs for grounding.
+/// Queries every configured provider in parallel and aggregates the results so the AI can
+/// synthesize a single description from the union of evidence. Each provider's failure is
+/// isolated — one rate limit or network error never blocks the others. The Library badges
+/// downstream show every provider that actually contributed a hit.
 /// </summary>
 internal sealed class CompositeMetadataLookupService : IBookMetadataLookupService
 {
@@ -33,42 +34,41 @@ internal sealed class CompositeMetadataLookupService : IBookMetadataLookupServic
         string? author,
         CancellationToken ct = default)
     {
-        var aggregated = new List<BookMetadataSource>();
-        foreach (var provider in _providers)
+        var lookupTasks = _providers
+            .Select(provider => SafeLookupAsync(provider, title, author, ct))
+            .ToArray();
+
+        var results = await Task.WhenAll(lookupTasks);
+
+        // Flatten, then sort highest match score first so the AI prompt leads with the strongest
+        // candidate. Each provider's hits already arrive in its own ranked order.
+        return results
+            .SelectMany(r => r)
+            .OrderByDescending(s => s.MatchScore)
+            .ToList();
+    }
+
+    private static async Task<IReadOnlyList<BookMetadataSource>> SafeLookupAsync(
+        IBookMetadataLookupService provider,
+        string title,
+        string? author,
+        CancellationToken ct)
+    {
+        try
         {
-            IReadOnlyList<BookMetadataSource> hits;
-            try
-            {
-                hits = await provider.LookupAsync(title, author, ct);
-            }
-            catch (HttpRequestException)
-            {
-                hits = [];
-            }
-            catch (TaskCanceledException) when (!ct.IsCancellationRequested)
-            {
-                hits = [];
-            }
-            catch (JsonException)
-            {
-                hits = [];
-            }
-
-            if (hits.Count > 0)
-            {
-                aggregated.AddRange(hits);
-
-                // If we have at least one hit with a real description, additional providers are
-                // unlikely to improve grounding — but their structured metadata (covers, ratings)
-                // can still be useful. Keep the rest for fallback enrichment up to a small cap.
-                if (hits.Any(h => !string.IsNullOrWhiteSpace(h.Description)) && aggregated.Count >= 3)
-                {
-                    break;
-                }
-            }
+            return await provider.LookupAsync(title, author, ct);
         }
-
-        aggregated.Sort((a, b) => b.MatchScore.CompareTo(a.MatchScore));
-        return aggregated;
+        catch (HttpRequestException)
+        {
+            return [];
+        }
+        catch (TaskCanceledException) when (!ct.IsCancellationRequested)
+        {
+            return [];
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
     }
 }
