@@ -1,5 +1,6 @@
 using System;
 using Microsoft.UI.Xaml;
+using Microsoft.Extensions.DependencyInjection;
 using BiblioText.Settings;
 using BiblioText.Persistence;
 using BiblioText.Services;
@@ -18,21 +19,30 @@ public partial class App : Application
 
     protected override async void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
     {
-        // Initialize settings
-        SettingsStore = new CompositeSettingsStore();
+        var services = new ServiceCollection();
+        services.AddSingleton<ISettingsStore, CompositeSettingsStore>();
+        services.AddSingleton<SqliteLibraryRepository>();
+        services.AddSingleton<ILibraryRepository>(sp => sp.GetRequiredService<SqliteLibraryRepository>());
+        services.AddSingleton<IBookTitleExtractor, AzureOpenAiTitleExtractor>();
+        services.AddSingleton<AzureOpenAiAnalysisClient>();
+        services.AddSingleton<ScanWorkflowService>();
+        services.AddSingleton<IReviewApplicationService, ReviewApplicationService>();
+        services.AddSingleton<IBookMetadataLookupService, OpenLibraryBookMetadataLookupService>();
+        services.AddSingleton<BookDescriptionService>();
+        services.AddSingleton<SemanticSearchService>();
+        Services = services.BuildServiceProvider();
 
-        // Initialize SQLite repository
-        var repo = new SqliteLibraryRepository();
+        SettingsStore = Services.GetRequiredService<ISettingsStore>();
+
+        var repo = Services.GetRequiredService<SqliteLibraryRepository>();
         await repo.InitializeAsync();
         LibraryRepository = repo;
 
-        // Initialize AI services
-        TitleExtractor = new AzureOpenAiTitleExtractor(SettingsStore);
-        AnalysisClient = new AzureOpenAiAnalysisClient(SettingsStore);
-        WorkflowService = new ScanWorkflowService(TitleExtractor, AnalysisClient, LibraryRepository);
+        TitleExtractor = Services.GetRequiredService<IBookTitleExtractor>();
+        AnalysisClient = Services.GetRequiredService<AzureOpenAiAnalysisClient>();
+        WorkflowService = Services.GetRequiredService<ScanWorkflowService>();
 
-        // Initialize semantic search
-        var searchService = new SemanticSearchService();
+        var searchService = Services.GetRequiredService<SemanticSearchService>();
         await searchService.InitializeAsync();
         SemanticSearchService = searchService;
 
@@ -41,6 +51,7 @@ public partial class App : Application
     }
 
     internal static MainWindow? Window { get; private set; }
+    internal static IServiceProvider? Services { get; private set; }
     internal static ISettingsStore? SettingsStore { get; private set; }
     internal static ILibraryRepository? LibraryRepository { get; private set; }
     internal static IBookTitleExtractor? TitleExtractor { get; private set; }

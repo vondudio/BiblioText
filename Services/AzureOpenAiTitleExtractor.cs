@@ -17,7 +17,7 @@ namespace BiblioText.Services;
 /// </summary>
 internal sealed class AzureOpenAiTitleExtractor : IBookTitleExtractor
 {
-    private readonly HttpClient _httpClient = new();
+    private readonly HttpClient _httpClient = AzureOpenAiHttp.CreateClient();
     private readonly ISettingsStore _settingsStore;
 
     public AzureOpenAiTitleExtractor(ISettingsStore settingsStore)
@@ -57,24 +57,29 @@ internal sealed class AzureOpenAiTitleExtractor : IBookTitleExtractor
 
         var url = $"{settings.AzureOpenAiEndpoint!.TrimEnd('/')}/openai/deployments/{settings.AzureOpenAiDeployment}/chat/completions?api-version={settings.ApiVersion}";
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, url);
-        request.Headers.Add("api-key", settings.AzureOpenAiApiKey);
-        request.Content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
+        var serializedBody = JsonSerializer.Serialize(requestBody);
+        var result = await AzureOpenAiHttp.SendAsync(
+            _httpClient,
+            () =>
+            {
+                var request = new HttpRequestMessage(HttpMethod.Post, url);
+                request.Headers.Add("api-key", settings.AzureOpenAiApiKey);
+                request.Content = new StringContent(serializedBody, Encoding.UTF8, "application/json");
+                return request;
+            },
+            ct);
 
-        using var response = await _httpClient.SendAsync(request, ct);
-        var json = await response.Content.ReadAsStringAsync(ct);
-
-        if (!response.IsSuccessStatusCode)
-            return new ExtractionResult { Title = $"(AI error: {response.StatusCode})", Author = "", Confidence = 0 };
+        if (!result.IsSuccess || result.Value == null)
+        {
+            return new ExtractionResult { Title = $"(AI error: {result.ErrorMessage ?? "request failed"})", Author = "", Confidence = 0 };
+        }
 
         try
         {
-            using var doc = JsonDocument.Parse(json);
-            var content = doc.RootElement
-                .GetProperty("choices")[0]
-                .GetProperty("message")
-                .GetProperty("content")
-                .GetString()?.Trim() ?? "";
+            if (!AzureOpenAiHttp.TryGetMessageContent(result.Value, out var content, out _))
+            {
+                return new ExtractionResult { Title = "unknown", Author = "", Confidence = 0 };
+            }
 
             return ParseExtractionJson(content);
         }
@@ -108,7 +113,7 @@ internal sealed class AzureOpenAiTitleExtractor : IBookTitleExtractor
         }
         catch
         {
-            // Fallback: try comma-separated parsing
+            // Fallback: try comma/dash/by-separated parsing
             return ParsePlainText(content);
         }
     }

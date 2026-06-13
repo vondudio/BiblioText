@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using BiblioText.Models;
 using Microsoft.Data.Sqlite;
@@ -12,6 +13,7 @@ namespace BiblioText.Persistence;
 public sealed class SqliteLibraryRepository : ILibraryRepository, IDisposable
 {
     private readonly string _connectionString;
+    private readonly SemaphoreSlim _dbGate = new(1, 1);
     private SqliteConnection? _connection;
 
     public SqliteLibraryRepository()
@@ -62,6 +64,9 @@ public sealed class SqliteLibraryRepository : ILibraryRepository, IDisposable
                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
                 modified_at TEXT,
                 is_duplicate INTEGER NOT NULL DEFAULT 0,
+                is_description_grounded INTEGER NOT NULL DEFAULT 0,
+                description_sources_json TEXT,
+                description_generated_at TEXT,
                 notes TEXT,
                 FOREIGN KEY (scan_id) REFERENCES scans(id),
                 FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE SET NULL
@@ -114,17 +119,94 @@ public sealed class SqliteLibraryRepository : ILibraryRepository, IDisposable
             alter.CommandText = "ALTER TABLE books ADD COLUMN long_description TEXT;";
             await alter.ExecuteNonQueryAsync();
         }
+        if (!columns.Contains("is_description_grounded"))
+        {
+            using var alter = _connection!.CreateCommand();
+            alter.CommandText = "ALTER TABLE books ADD COLUMN is_description_grounded INTEGER NOT NULL DEFAULT 0;";
+            await alter.ExecuteNonQueryAsync();
+        }
+        if (!columns.Contains("description_sources_json"))
+        {
+            using var alter = _connection!.CreateCommand();
+            alter.CommandText = "ALTER TABLE books ADD COLUMN description_sources_json TEXT;";
+            await alter.ExecuteNonQueryAsync();
+        }
+        if (!columns.Contains("description_generated_at"))
+        {
+            using var alter = _connection!.CreateCommand();
+            alter.CommandText = "ALTER TABLE books ADD COLUMN description_generated_at TEXT;";
+            await alter.ExecuteNonQueryAsync();
+        }
+
+        using var indexes = _connection!.CreateCommand();
+        indexes.CommandText = """
+            CREATE INDEX IF NOT EXISTS idx_books_created_at ON books(created_at);
+            CREATE INDEX IF NOT EXISTS idx_books_location_id ON books(location_id);
+            CREATE INDEX IF NOT EXISTS idx_books_title ON books(title COLLATE NOCASE);
+            CREATE INDEX IF NOT EXISTS idx_books_author ON books(author COLLATE NOCASE);
+            CREATE INDEX IF NOT EXISTS idx_books_duplicate ON books(is_duplicate);
+            """;
+        await indexes.ExecuteNonQueryAsync();
     }
 
     // Books
 
     public async Task<int> AddBookAsync(Book book)
     {
-        EnsureConnected();
+        await _dbGate.WaitAsync();
+        try
+        {
+            EnsureConnected();
+            return await AddBookCoreAsync(book);
+        }
+        finally
+        {
+            _dbGate.Release();
+        }
+    }
+
+    public async Task<List<int>> AddBooksAsync(IReadOnlyList<Book> books)
+    {
+        var ids = new List<int>(books.Count);
+        if (books.Count == 0)
+        {
+            return ids;
+        }
+
+        await _dbGate.WaitAsync();
+        try
+        {
+            EnsureConnected();
+            using var transaction = (SqliteTransaction)await _connection!.BeginTransactionAsync();
+            try
+            {
+                foreach (var book in books)
+                {
+                    ids.Add(await AddBookCoreAsync(book, transaction));
+                }
+
+                await transaction.CommitAsync();
+                return ids;
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
+        }
+        finally
+        {
+            _dbGate.Release();
+        }
+    }
+
+    private async Task<int> AddBookCoreAsync(Book book, SqliteTransaction? transaction = null)
+    {
         using var cmd = _connection!.CreateCommand();
+        cmd.Transaction = transaction;
         cmd.CommandText = """
-            INSERT INTO books (title, author, short_description, long_description, scan_id, location_id, spine_image_path, bookshelf_image_path, detection_index, created_at, is_duplicate, notes)
-            VALUES (@title, @author, @shortDesc, @longDesc, @scanId, @locationId, @spinePath, @bookshelfPath, @detectionIndex, @createdAt, @isDuplicate, @notes);
+            INSERT INTO books (title, author, short_description, long_description, scan_id, location_id, spine_image_path, bookshelf_image_path, detection_index, created_at, is_duplicate, is_description_grounded, description_sources_json, description_generated_at, notes)
+            VALUES (@title, @author, @shortDesc, @longDesc, @scanId, @locationId, @spinePath, @bookshelfPath, @detectionIndex, @createdAt, @isDuplicate, @isDescriptionGrounded, @descriptionSourcesJson, @descriptionGeneratedAt, @notes);
             SELECT last_insert_rowid();
             """;
         cmd.Parameters.AddWithValue("@title", book.Title);
@@ -138,6 +220,9 @@ public sealed class SqliteLibraryRepository : ILibraryRepository, IDisposable
         cmd.Parameters.AddWithValue("@detectionIndex", (object?)book.DetectionIndex ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@createdAt", book.CreatedAt.ToString("o"));
         cmd.Parameters.AddWithValue("@isDuplicate", book.IsDuplicate ? 1 : 0);
+        cmd.Parameters.AddWithValue("@isDescriptionGrounded", book.IsDescriptionGrounded ? 1 : 0);
+        cmd.Parameters.AddWithValue("@descriptionSourcesJson", (object?)book.DescriptionSourcesJson ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@descriptionGeneratedAt", book.DescriptionGeneratedAt.HasValue ? book.DescriptionGeneratedAt.Value.ToString("o") : DBNull.Value);
         cmd.Parameters.AddWithValue("@notes", (object?)book.Notes ?? DBNull.Value);
 
         var result = await cmd.ExecuteScalarAsync();
@@ -147,177 +232,262 @@ public sealed class SqliteLibraryRepository : ILibraryRepository, IDisposable
 
     public async Task UpdateBookAsync(Book book)
     {
-        EnsureConnected();
-        using var cmd = _connection!.CreateCommand();
-        cmd.CommandText = """
-            UPDATE books SET title=@title, author=@author, short_description=@shortDesc, long_description=@longDesc,
-                location_id=@locationId, spine_image_path=@spinePath, bookshelf_image_path=@bookshelfPath,
-                detection_index=@detectionIndex, modified_at=@modifiedAt, is_duplicate=@isDuplicate, notes=@notes
-            WHERE id=@id;
-            """;
-        cmd.Parameters.AddWithValue("@id", book.Id);
-        cmd.Parameters.AddWithValue("@title", book.Title);
-        cmd.Parameters.AddWithValue("@author", (object?)book.Author ?? DBNull.Value);
-        cmd.Parameters.AddWithValue("@shortDesc", (object?)book.ShortDescription ?? DBNull.Value);
-        cmd.Parameters.AddWithValue("@longDesc", (object?)book.LongDescription ?? DBNull.Value);
-        cmd.Parameters.AddWithValue("@locationId", (object?)book.LocationId ?? DBNull.Value);
-        cmd.Parameters.AddWithValue("@spinePath", (object?)book.SpineImagePath ?? DBNull.Value);
-        cmd.Parameters.AddWithValue("@bookshelfPath", (object?)book.BookshelfImagePath ?? DBNull.Value);
-        cmd.Parameters.AddWithValue("@detectionIndex", (object?)book.DetectionIndex ?? DBNull.Value);
-        cmd.Parameters.AddWithValue("@modifiedAt", DateTime.UtcNow.ToString("o"));
-        cmd.Parameters.AddWithValue("@isDuplicate", book.IsDuplicate ? 1 : 0);
-        cmd.Parameters.AddWithValue("@notes", (object?)book.Notes ?? DBNull.Value);
-        await cmd.ExecuteNonQueryAsync();
+        await _dbGate.WaitAsync();
+        try
+        {
+            EnsureConnected();
+            using var cmd = _connection!.CreateCommand();
+            cmd.CommandText = """
+                UPDATE books SET title=@title, author=@author, short_description=@shortDesc, long_description=@longDesc,
+                    location_id=@locationId, spine_image_path=@spinePath, bookshelf_image_path=@bookshelfPath,
+                    detection_index=@detectionIndex, modified_at=@modifiedAt, is_duplicate=@isDuplicate,
+                    is_description_grounded=@isDescriptionGrounded, description_sources_json=@descriptionSourcesJson,
+                    description_generated_at=@descriptionGeneratedAt, notes=@notes
+                WHERE id=@id;
+                """;
+            cmd.Parameters.AddWithValue("@id", book.Id);
+            cmd.Parameters.AddWithValue("@title", book.Title);
+            cmd.Parameters.AddWithValue("@author", (object?)book.Author ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@shortDesc", (object?)book.ShortDescription ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@longDesc", (object?)book.LongDescription ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@locationId", (object?)book.LocationId ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@spinePath", (object?)book.SpineImagePath ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@bookshelfPath", (object?)book.BookshelfImagePath ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@detectionIndex", (object?)book.DetectionIndex ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@modifiedAt", DateTime.UtcNow.ToString("o"));
+            cmd.Parameters.AddWithValue("@isDuplicate", book.IsDuplicate ? 1 : 0);
+            cmd.Parameters.AddWithValue("@isDescriptionGrounded", book.IsDescriptionGrounded ? 1 : 0);
+            cmd.Parameters.AddWithValue("@descriptionSourcesJson", (object?)book.DescriptionSourcesJson ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@descriptionGeneratedAt", book.DescriptionGeneratedAt.HasValue ? book.DescriptionGeneratedAt.Value.ToString("o") : DBNull.Value);
+            cmd.Parameters.AddWithValue("@notes", (object?)book.Notes ?? DBNull.Value);
+            await cmd.ExecuteNonQueryAsync();
+        }
+        finally
+        {
+            _dbGate.Release();
+        }
     }
 
     public async Task DeleteBookAsync(int bookId)
     {
-        EnsureConnected();
-        using var cmd = _connection!.CreateCommand();
-        cmd.CommandText = "DELETE FROM books WHERE id=@id;";
-        cmd.Parameters.AddWithValue("@id", bookId);
-        await cmd.ExecuteNonQueryAsync();
+        await _dbGate.WaitAsync();
+        try
+        {
+            EnsureConnected();
+            using var cmd = _connection!.CreateCommand();
+            cmd.CommandText = "DELETE FROM books WHERE id=@id;";
+            cmd.Parameters.AddWithValue("@id", bookId);
+            await cmd.ExecuteNonQueryAsync();
+        }
+        finally
+        {
+            _dbGate.Release();
+        }
     }
 
     public async Task<List<Book>> GetBooksAsync(string? searchQuery = null, int? locationId = null)
     {
-        EnsureConnected();
-        using var cmd = _connection!.CreateCommand();
-        var where = new List<string>();
-        if (!string.IsNullOrWhiteSpace(searchQuery))
+        await _dbGate.WaitAsync();
+        try
         {
-            where.Add("(title LIKE @search OR author LIKE @search OR short_description LIKE @search OR long_description LIKE @search)");
-            cmd.Parameters.AddWithValue("@search", $"%{searchQuery}%");
-        }
-        if (locationId.HasValue)
-        {
-            where.Add("location_id=@locId");
-            cmd.Parameters.AddWithValue("@locId", locationId.Value);
-        }
+            EnsureConnected();
+            using var cmd = _connection!.CreateCommand();
+            var where = new List<string>();
+            if (!string.IsNullOrWhiteSpace(searchQuery))
+            {
+                where.Add("(title LIKE @search OR author LIKE @search OR short_description LIKE @search OR long_description LIKE @search)");
+                cmd.Parameters.AddWithValue("@search", $"%{searchQuery}%");
+            }
+            if (locationId.HasValue)
+            {
+                where.Add("location_id=@locId");
+                cmd.Parameters.AddWithValue("@locId", locationId.Value);
+            }
 
-        var whereClause = where.Count > 0 ? "WHERE " + string.Join(" AND ", where) : "";
-        cmd.CommandText = $"SELECT * FROM books {whereClause} ORDER BY created_at DESC;";
+            var whereClause = where.Count > 0 ? "WHERE " + string.Join(" AND ", where) : "";
+            cmd.CommandText = $"SELECT * FROM books {whereClause} ORDER BY created_at DESC;";
 
-        var books = new List<Book>();
-        using var reader = await cmd.ExecuteReaderAsync();
-        while (await reader.ReadAsync())
-        {
-            books.Add(ReadBook(reader));
+            var books = new List<Book>();
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                books.Add(ReadBook(reader));
+            }
+            return books;
         }
-        return books;
+        finally
+        {
+            _dbGate.Release();
+        }
     }
 
     public async Task<Book?> GetBookByIdAsync(int id)
     {
-        EnsureConnected();
-        using var cmd = _connection!.CreateCommand();
-        cmd.CommandText = "SELECT * FROM books WHERE id=@id;";
-        cmd.Parameters.AddWithValue("@id", id);
-        using var reader = await cmd.ExecuteReaderAsync();
-        return await reader.ReadAsync() ? ReadBook(reader) : null;
+        await _dbGate.WaitAsync();
+        try
+        {
+            EnsureConnected();
+            using var cmd = _connection!.CreateCommand();
+            cmd.CommandText = "SELECT * FROM books WHERE id=@id;";
+            cmd.Parameters.AddWithValue("@id", id);
+            using var reader = await cmd.ExecuteReaderAsync();
+            return await reader.ReadAsync() ? ReadBook(reader) : null;
+        }
+        finally
+        {
+            _dbGate.Release();
+        }
     }
 
     // Locations
 
     public async Task<int> AddLocationAsync(Location location)
     {
-        EnsureConnected();
-        using var cmd = _connection!.CreateCommand();
-        cmd.CommandText = """
-            INSERT INTO locations (name, description, created_at) VALUES (@name, @desc, @createdAt);
-            SELECT last_insert_rowid();
-            """;
-        cmd.Parameters.AddWithValue("@name", location.Name);
-        cmd.Parameters.AddWithValue("@desc", (object?)location.Description ?? DBNull.Value);
-        cmd.Parameters.AddWithValue("@createdAt", location.CreatedAt.ToString("o"));
-        var result = await cmd.ExecuteScalarAsync();
-        location.Id = Convert.ToInt32(result);
-        return location.Id;
+        await _dbGate.WaitAsync();
+        try
+        {
+            EnsureConnected();
+            using var cmd = _connection!.CreateCommand();
+            cmd.CommandText = """
+                INSERT INTO locations (name, description, created_at) VALUES (@name, @desc, @createdAt);
+                SELECT last_insert_rowid();
+                """;
+            cmd.Parameters.AddWithValue("@name", location.Name);
+            cmd.Parameters.AddWithValue("@desc", (object?)location.Description ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@createdAt", location.CreatedAt.ToString("o"));
+            var result = await cmd.ExecuteScalarAsync();
+            location.Id = Convert.ToInt32(result);
+            return location.Id;
+        }
+        finally
+        {
+            _dbGate.Release();
+        }
     }
 
     public async Task UpdateLocationAsync(Location location)
     {
-        EnsureConnected();
-        using var cmd = _connection!.CreateCommand();
-        cmd.CommandText = "UPDATE locations SET name=@name, description=@desc WHERE id=@id;";
-        cmd.Parameters.AddWithValue("@id", location.Id);
-        cmd.Parameters.AddWithValue("@name", location.Name);
-        cmd.Parameters.AddWithValue("@desc", (object?)location.Description ?? DBNull.Value);
-        await cmd.ExecuteNonQueryAsync();
+        await _dbGate.WaitAsync();
+        try
+        {
+            EnsureConnected();
+            using var cmd = _connection!.CreateCommand();
+            cmd.CommandText = "UPDATE locations SET name=@name, description=@desc WHERE id=@id;";
+            cmd.Parameters.AddWithValue("@id", location.Id);
+            cmd.Parameters.AddWithValue("@name", location.Name);
+            cmd.Parameters.AddWithValue("@desc", (object?)location.Description ?? DBNull.Value);
+            await cmd.ExecuteNonQueryAsync();
+        }
+        finally
+        {
+            _dbGate.Release();
+        }
     }
 
     public async Task DeleteLocationAsync(int locationId)
     {
-        EnsureConnected();
-        using var cmd = _connection!.CreateCommand();
-        cmd.CommandText = "DELETE FROM locations WHERE id=@id;";
-        cmd.Parameters.AddWithValue("@id", locationId);
-        await cmd.ExecuteNonQueryAsync();
+        await _dbGate.WaitAsync();
+        try
+        {
+            EnsureConnected();
+            using var cmd = _connection!.CreateCommand();
+            cmd.CommandText = "DELETE FROM locations WHERE id=@id;";
+            cmd.Parameters.AddWithValue("@id", locationId);
+            await cmd.ExecuteNonQueryAsync();
+        }
+        finally
+        {
+            _dbGate.Release();
+        }
     }
 
     public async Task<List<Location>> GetLocationsAsync()
     {
-        EnsureConnected();
-        using var cmd = _connection!.CreateCommand();
-        cmd.CommandText = "SELECT * FROM locations ORDER BY name;";
-        var locations = new List<Location>();
-        using var reader = await cmd.ExecuteReaderAsync();
-        while (await reader.ReadAsync())
+        await _dbGate.WaitAsync();
+        try
         {
-            locations.Add(new Location
+            EnsureConnected();
+            using var cmd = _connection!.CreateCommand();
+            cmd.CommandText = "SELECT * FROM locations ORDER BY name;";
+            var locations = new List<Location>();
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
             {
-                Id = reader.GetInt32(reader.GetOrdinal("id")),
-                Name = reader.GetString(reader.GetOrdinal("name")),
-                Description = reader.IsDBNull(reader.GetOrdinal("description")) ? null : reader.GetString(reader.GetOrdinal("description")),
-                CreatedAt = DateTime.Parse(reader.GetString(reader.GetOrdinal("created_at")))
-            });
+                locations.Add(new Location
+                {
+                    Id = reader.GetInt32(reader.GetOrdinal("id")),
+                    Name = reader.GetString(reader.GetOrdinal("name")),
+                    Description = reader.IsDBNull(reader.GetOrdinal("description")) ? null : reader.GetString(reader.GetOrdinal("description")),
+                    CreatedAt = DateTime.Parse(reader.GetString(reader.GetOrdinal("created_at")))
+                });
+            }
+            return locations;
         }
-        return locations;
+        finally
+        {
+            _dbGate.Release();
+        }
     }
 
     // Scans
 
     public async Task<int> AddScanAsync(Scan scan)
     {
-        EnsureConnected();
-        using var cmd = _connection!.CreateCommand();
-        cmd.CommandText = """
-            INSERT INTO scans (file_path, thumbnail_path, scanned_at, book_count, analysis_method, is_reviewed)
-            VALUES (@filePath, @thumbPath, @scannedAt, @bookCount, @method, @reviewed);
-            SELECT last_insert_rowid();
-            """;
-        cmd.Parameters.AddWithValue("@filePath", scan.FilePath);
-        cmd.Parameters.AddWithValue("@thumbPath", (object?)scan.ThumbnailPath ?? DBNull.Value);
-        cmd.Parameters.AddWithValue("@scannedAt", scan.ScannedAt.ToString("o"));
-        cmd.Parameters.AddWithValue("@bookCount", scan.BookCount);
-        cmd.Parameters.AddWithValue("@method", (object?)scan.AnalysisMethod ?? DBNull.Value);
-        cmd.Parameters.AddWithValue("@reviewed", scan.IsReviewed ? 1 : 0);
-        var result = await cmd.ExecuteScalarAsync();
-        scan.Id = Convert.ToInt32(result);
-        return scan.Id;
+        await _dbGate.WaitAsync();
+        try
+        {
+            EnsureConnected();
+            using var cmd = _connection!.CreateCommand();
+            cmd.CommandText = """
+                INSERT INTO scans (file_path, thumbnail_path, scanned_at, book_count, analysis_method, is_reviewed)
+                VALUES (@filePath, @thumbPath, @scannedAt, @bookCount, @method, @reviewed);
+                SELECT last_insert_rowid();
+                """;
+            cmd.Parameters.AddWithValue("@filePath", scan.FilePath);
+            cmd.Parameters.AddWithValue("@thumbPath", (object?)scan.ThumbnailPath ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@scannedAt", scan.ScannedAt.ToString("o"));
+            cmd.Parameters.AddWithValue("@bookCount", scan.BookCount);
+            cmd.Parameters.AddWithValue("@method", (object?)scan.AnalysisMethod ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@reviewed", scan.IsReviewed ? 1 : 0);
+            var result = await cmd.ExecuteScalarAsync();
+            scan.Id = Convert.ToInt32(result);
+            return scan.Id;
+        }
+        finally
+        {
+            _dbGate.Release();
+        }
     }
 
     public async Task<List<Scan>> GetScansAsync()
     {
-        EnsureConnected();
-        using var cmd = _connection!.CreateCommand();
-        cmd.CommandText = "SELECT * FROM scans ORDER BY scanned_at DESC;";
-        var scans = new List<Scan>();
-        using var reader = await cmd.ExecuteReaderAsync();
-        while (await reader.ReadAsync())
+        await _dbGate.WaitAsync();
+        try
         {
-            scans.Add(new Scan
+            EnsureConnected();
+            using var cmd = _connection!.CreateCommand();
+            cmd.CommandText = "SELECT * FROM scans ORDER BY scanned_at DESC;";
+            var scans = new List<Scan>();
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
             {
-                Id = reader.GetInt32(reader.GetOrdinal("id")),
-                FilePath = reader.GetString(reader.GetOrdinal("file_path")),
-                ThumbnailPath = reader.IsDBNull(reader.GetOrdinal("thumbnail_path")) ? null : reader.GetString(reader.GetOrdinal("thumbnail_path")),
-                ScannedAt = DateTime.Parse(reader.GetString(reader.GetOrdinal("scanned_at"))),
-                BookCount = reader.GetInt32(reader.GetOrdinal("book_count")),
-                AnalysisMethod = reader.IsDBNull(reader.GetOrdinal("analysis_method")) ? null : reader.GetString(reader.GetOrdinal("analysis_method")),
-                IsReviewed = reader.GetInt32(reader.GetOrdinal("is_reviewed")) == 1
-            });
+                scans.Add(new Scan
+                {
+                    Id = reader.GetInt32(reader.GetOrdinal("id")),
+                    FilePath = reader.GetString(reader.GetOrdinal("file_path")),
+                    ThumbnailPath = reader.IsDBNull(reader.GetOrdinal("thumbnail_path")) ? null : reader.GetString(reader.GetOrdinal("thumbnail_path")),
+                    ScannedAt = DateTime.Parse(reader.GetString(reader.GetOrdinal("scanned_at"))),
+                    BookCount = reader.GetInt32(reader.GetOrdinal("book_count")),
+                    AnalysisMethod = reader.IsDBNull(reader.GetOrdinal("analysis_method")) ? null : reader.GetString(reader.GetOrdinal("analysis_method")),
+                    IsReviewed = reader.GetInt32(reader.GetOrdinal("is_reviewed")) == 1
+                });
+            }
+            return scans;
         }
-        return scans;
+        finally
+        {
+            _dbGate.Release();
+        }
     }
 
     private static Book ReadBook(SqliteDataReader reader)
@@ -337,6 +507,9 @@ public sealed class SqliteLibraryRepository : ILibraryRepository, IDisposable
             CreatedAt = DateTime.Parse(reader.GetString(reader.GetOrdinal("created_at"))),
             ModifiedAt = reader.IsDBNull(reader.GetOrdinal("modified_at")) ? null : DateTime.Parse(reader.GetString(reader.GetOrdinal("modified_at"))),
             IsDuplicate = reader.GetInt32(reader.GetOrdinal("is_duplicate")) == 1,
+            IsDescriptionGrounded = reader.GetInt32(reader.GetOrdinal("is_description_grounded")) == 1,
+            DescriptionSourcesJson = reader.IsDBNull(reader.GetOrdinal("description_sources_json")) ? null : reader.GetString(reader.GetOrdinal("description_sources_json")),
+            DescriptionGeneratedAt = reader.IsDBNull(reader.GetOrdinal("description_generated_at")) ? null : DateTime.Parse(reader.GetString(reader.GetOrdinal("description_generated_at"))),
             Notes = reader.IsDBNull(reader.GetOrdinal("notes")) ? null : reader.GetString(reader.GetOrdinal("notes"))
         };
     }
@@ -375,5 +548,6 @@ public sealed class SqliteLibraryRepository : ILibraryRepository, IDisposable
     public void Dispose()
     {
         _connection?.Dispose();
+        _dbGate.Dispose();
     }
 }

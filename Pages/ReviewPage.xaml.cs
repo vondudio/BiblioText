@@ -356,7 +356,14 @@ public sealed partial class ReviewPage : Page
 
             var descService = new BookDescriptionService(settingsStore);
             var bookList = books.Select(b => (b.Id, b.Title, b.Author)).ToList();
-            var descriptions = await descService.GetDescriptionsAsync(bookList);
+            var descriptionResult = await descService.GetDescriptionsResultAsync(bookList);
+            if (!descriptionResult.IsSuccess)
+            {
+                ReviewStatusText.Text = $"Descriptions skipped: {descriptionResult.ErrorMessage}";
+                return;
+            }
+
+            var descriptions = descriptionResult.Descriptions;
 
             if (descriptions.Count == 0)
             {
@@ -373,6 +380,9 @@ public sealed partial class ReviewPage : Page
                 {
                     book.ShortDescription = desc.ShortDescription;
                     book.LongDescription = desc.LongDescription;
+                    book.IsDescriptionGrounded = desc.IsGrounded;
+                    book.DescriptionSourcesJson = desc.SourcesJson;
+                    book.DescriptionGeneratedAt = desc.GeneratedAt;
                     await repo.UpdateBookAsync(book);
 
                     var searchService = App.SemanticSearchService;

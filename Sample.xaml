@@ -66,7 +66,8 @@
                         MinWidth="180"
                         DisplayMemberPath="DisplayName"
                         SelectionChanged="ModelPicker_SelectionChanged"
-                        ToolTipService.ToolTip="Select model" />
+                        ToolTipService.ToolTip="Select model"
+                        AutomationProperties.Name="Detection model" />
                     <StackPanel
                         x:Name="ConfidencePanel"
                         Orientation="Horizontal"
@@ -85,7 +86,8 @@
                             TickFrequency="0.1"
                             Width="240"
                             Value="0.20"
-                            ValueChanged="ConfidenceSlider_ValueChanged" />
+                            ValueChanged="ConfidenceSlider_ValueChanged"
+                            AutomationProperties.Name="Confidence threshold" />
                         <TextBox
                             x:Name="ConfidenceText"
                             Width="60"
@@ -95,7 +97,8 @@
                             VerticalAlignment="Center"
                             LostFocus="ConfidenceText_LostFocus"
                             KeyDown="ConfidenceText_KeyDown"
-                            ToolTipService.ToolTip="Type a value (0.05 - 0.95) and press Enter" />
+                            ToolTipService.ToolTip="Type a value (0.05 - 0.95) and press Enter"
+                            AutomationProperties.Name="Confidence threshold value" />
                         <StackPanel
                             Orientation="Vertical"
                             VerticalAlignment="Center"
@@ -351,7 +354,8 @@
                             x:Name="RemoveButton"
                             Click="RemoveButton_Click"
                             IsEnabled="False"
-                            ToolTipService.ToolTip="Remove selected image">
+                            ToolTipService.ToolTip="Remove selected image"
+                            AutomationProperties.Name="Remove selected image">
                             <StackPanel Orientation="Horizontal" Spacing="6">
                                 <FontIcon FontFamily="Segoe MDL2 Assets" FontSize="14" Glyph="&#xE74D;" />
                                 <TextBlock Text="REMOVE" FontWeight="SemiBold" />
@@ -361,7 +365,8 @@
                             x:Name="ExtractButton"
                             Click="ExtractButton_Click"
                             IsEnabled="False"
-                            ToolTipService.ToolTip="Crop each detection and submit to the title-extraction stub (Azure OpenAI GPT-5.4)">
+                            ToolTipService.ToolTip="Crop each detection and submit to Azure OpenAI for title extraction"
+                            AutomationProperties.Name="Extract titles from detected book spines">
                             <StackPanel Orientation="Horizontal" Spacing="6">
                                 <FontIcon FontFamily="Segoe MDL2 Assets" FontSize="14" Glyph="&#xE8FA;" />
                                 <TextBlock Text="EXTRACT TITLES" FontWeight="SemiBold" />
@@ -371,7 +376,8 @@
                             x:Name="AiAnalyzeButton"
                             Click="AiAnalyzeButton_Click"
                             IsEnabled="False"
-                            ToolTipService.ToolTip="Send the full image to Azure OpenAI for bookshelf analysis (no YOLO needed)">
+                            ToolTipService.ToolTip="Send the full image to Azure OpenAI for bookshelf analysis"
+                            AutomationProperties.Name="Analyze full bookshelf image with AI">
                             <StackPanel Orientation="Horizontal" Spacing="6">
                                 <FontIcon FontFamily="Segoe MDL2 Assets" FontSize="14" Glyph="&#xE9D9;" />
                                 <TextBlock Text="AI ANALYZE" FontWeight="SemiBold" />
@@ -394,7 +400,8 @@
                 x:Name="ScanStatusText"
                 FontSize="12"
                 Opacity="0.8"
-                Text="Ready" />
+                Text="Ready"
+                AutomationProperties.Name="Scan status" />
         </Border>
     </Grid>
 </Page>

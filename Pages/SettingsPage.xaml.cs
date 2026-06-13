@@ -2,7 +2,10 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using System;
 using System.Net.Http;
+using System.Text;
+using System.Text.Json;
 using BiblioText.Settings;
+using BiblioText.Services;
 
 namespace BiblioText.Pages;
 
@@ -88,18 +91,29 @@ public sealed partial class SettingsPage : Page
         TestButton.IsEnabled = false;
         try
         {
-            using var client = new HttpClient();
-            client.DefaultRequestHeaders.Add("api-key", settings.AzureOpenAiApiKey);
+            using var client = AzureOpenAiHttp.CreateClient();
             var url = $"{settings.AzureOpenAiEndpoint!.TrimEnd('/')}/openai/deployments/{settings.AzureOpenAiDeployment}/chat/completions?api-version={settings.ApiVersion}";
+            var serializedBody = JsonSerializer.Serialize(new
+            {
+                messages = new object[]
+                {
+                    new { role = "user", content = "Say hello" }
+                },
+                max_completion_tokens = 5
+            });
 
-            var body = new StringContent(
-                """{"messages":[{"role":"user","content":"Say hello"}],"max_completion_tokens":5}""",
-                System.Text.Encoding.UTF8,
-                "application/json");
+            var result = await AzureOpenAiHttp.SendAsync(
+                client,
+                () =>
+                {
+                    var request = new HttpRequestMessage(HttpMethod.Post, url);
+                    request.Headers.Add("api-key", settings.AzureOpenAiApiKey);
+                    request.Content = new StringContent(serializedBody, Encoding.UTF8, "application/json");
+                    return request;
+                },
+                default);
 
-            var response = await client.PostAsync(url, body);
-
-            if (response.IsSuccessStatusCode)
+            if (result.IsSuccess)
             {
                 StatusBar.IsOpen = true;
                 StatusBar.Severity = InfoBarSeverity.Success;
@@ -107,10 +121,11 @@ public sealed partial class SettingsPage : Page
             }
             else
             {
-                var content = await response.Content.ReadAsStringAsync();
                 StatusBar.IsOpen = true;
                 StatusBar.Severity = InfoBarSeverity.Error;
-                StatusBar.Message = $"Connection failed: {response.StatusCode} — {content[..Math.Min(content.Length, 200)]}";
+                StatusBar.Message = result.DiagnosticDetail == null
+                    ? $"Connection failed: {result.ErrorMessage}"
+                    : $"Connection failed: {result.ErrorMessage} {result.DiagnosticDetail}";
             }
         }
         catch (Exception ex)

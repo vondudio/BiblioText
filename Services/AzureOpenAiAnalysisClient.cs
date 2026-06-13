@@ -15,9 +15,9 @@ namespace BiblioText.Services;
 /// Analyzes a full bookshelf image using Azure OpenAI vision to detect all visible book spines.
 /// Returns structured results with titles, authors, and approximate positions.
 /// </summary>
-internal sealed class AzureOpenAiAnalysisClient
+    internal sealed class AzureOpenAiAnalysisClient
 {
-    private readonly HttpClient _httpClient = new();
+    private readonly HttpClient _httpClient = AzureOpenAiHttp.CreateClient();
     private readonly ISettingsStore _settingsStore;
 
     public AzureOpenAiAnalysisClient(ISettingsStore settingsStore)
@@ -66,27 +66,38 @@ internal sealed class AzureOpenAiAnalysisClient
 
         var url = $"{settings.AzureOpenAiEndpoint!.TrimEnd('/')}/openai/deployments/{settings.AzureOpenAiDeployment}/chat/completions?api-version={settings.ApiVersion}";
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, url);
-        request.Headers.Add("api-key", settings.AzureOpenAiApiKey);
-        request.Content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
+        var serializedBody = JsonSerializer.Serialize(requestBody);
+        var result = await AzureOpenAiHttp.SendAsync(
+            _httpClient,
+            () =>
+            {
+                var request = new HttpRequestMessage(HttpMethod.Post, url);
+                request.Headers.Add("api-key", settings.AzureOpenAiApiKey);
+                request.Content = new StringContent(serializedBody, Encoding.UTF8, "application/json");
+                return request;
+            },
+            ct);
 
-        using var response = await _httpClient.SendAsync(request, ct);
-        var json = await response.Content.ReadAsStringAsync(ct);
-
-        if (!response.IsSuccessStatusCode)
-            return new FullImageAnalysisResult { Error = $"API error: {response.StatusCode} — {json[..Math.Min(json.Length, 200)]}" };
+        if (!result.IsSuccess || result.Value == null)
+        {
+            return new FullImageAnalysisResult
+            {
+                Error = result.ErrorMessage ?? "Azure OpenAI request failed.",
+                ErrorKind = result.ErrorKind,
+                DiagnosticDetail = result.DiagnosticDetail
+            };
+        }
 
         try
         {
-            using var doc = JsonDocument.Parse(json);
-            var content = doc.RootElement
-                .GetProperty("choices")[0]
-                .GetProperty("message")
-                .GetProperty("content")
-                .GetString();
-
-            if (string.IsNullOrWhiteSpace(content))
-                return new FullImageAnalysisResult { Error = "Empty response from AI." };
+            if (!AzureOpenAiHttp.TryGetMessageContent(result.Value, out var content, out var contentError))
+            {
+                return new FullImageAnalysisResult
+                {
+                    Error = contentError,
+                    ErrorKind = AzureOpenAiErrorKind.EmptyResponse
+                };
+            }
 
             // Parse the JSON response
             var analysisResponse = JsonSerializer.Deserialize<AnalysisJsonResponse>(content, new JsonSerializerOptions
@@ -101,7 +112,11 @@ internal sealed class AzureOpenAiAnalysisClient
         }
         catch (Exception ex)
         {
-            return new FullImageAnalysisResult { Error = $"Failed to parse AI response: {ex.Message}" };
+            return new FullImageAnalysisResult
+            {
+                Error = $"Failed to parse AI response: {ex.Message}",
+                ErrorKind = AzureOpenAiErrorKind.Parse
+            };
         }
     }
 }
@@ -110,6 +125,8 @@ public sealed class FullImageAnalysisResult
 {
     public List<DetectedBook>? Books { get; set; }
     public string? Error { get; set; }
+    internal AzureOpenAiErrorKind ErrorKind { get; set; }
+    public string? DiagnosticDetail { get; set; }
     public bool IsSuccess => Error == null && Books != null;
 }
 

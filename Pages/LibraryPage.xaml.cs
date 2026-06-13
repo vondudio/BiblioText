@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using BiblioText.Models;
 using BiblioText.Persistence;
@@ -20,6 +21,7 @@ public sealed partial class LibraryPage : Page
     private string _searchQuery = string.Empty;
     private int? _selectedLocationId;
     private string? _sortOption;
+    private string? _statusFilter;
 
     public LibraryPage()
     {
@@ -27,6 +29,7 @@ public sealed partial class LibraryPage : Page
         this.NavigationCacheMode = Microsoft.UI.Xaml.Navigation.NavigationCacheMode.Required;
         BookList.ItemsSource = _books;
         LocationFilter.ItemsSource = _locations;
+        StatusFilter.SelectedIndex = 0;
         this.Loaded += LibraryPage_Loaded;
     }
 
@@ -65,7 +68,7 @@ public sealed partial class LibraryPage : Page
 
         var locations = await repo.GetLocationsAsync();
 
-        // Apply sort
+        books = ApplyStatusFilter(books);
         books = ApplySort(books);
 
         _books.Clear();
@@ -100,6 +103,16 @@ public sealed partial class LibraryPage : Page
         };
     }
 
+    private List<Book> ApplyStatusFilter(List<Book> books)
+    {
+        return _statusFilter switch
+        {
+            "Duplicates" => books.Where(b => b.IsDuplicate).ToList(),
+            "Missing Descriptions" => books.Where(b => string.IsNullOrWhiteSpace(b.ShortDescription) && string.IsNullOrWhiteSpace(b.LongDescription)).ToList(),
+            _ => books
+        };
+    }
+
     private async void SearchBox_TextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)
     {
         if (args.Reason == AutoSuggestionBoxTextChangeReason.UserInput)
@@ -122,6 +135,17 @@ public sealed partial class LibraryPage : Page
     {
         _sortOption = SortDropdown.SelectedItem as string;
         await RefreshAsync();
+    }
+
+    private async void StatusFilter_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        _statusFilter = StatusFilter.SelectedItem as string;
+        await RefreshAsync();
+    }
+
+    private void StartScanningButton_Click(object sender, RoutedEventArgs e)
+    {
+        App.Window?.NavigateToScan();
     }
 
     private void BookList_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -456,6 +480,9 @@ internal sealed class BookDisplay
         BookshelfImagePath = book.BookshelfImagePath;
         DetectionIndex = book.DetectionIndex;
         LocationName = locationName ?? "";
+        IsDuplicate = book.IsDuplicate;
+        IsDescriptionGrounded = book.IsDescriptionGrounded;
+        DescriptionSourcesJson = book.DescriptionSourcesJson;
         CreatedAtDisplay = book.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd");
 
         if (!string.IsNullOrEmpty(SpineImagePath) && File.Exists(SpineImagePath))
@@ -469,7 +496,17 @@ internal sealed class BookDisplay
     public string Author { get; }
     public string ShortDescription { get; }
     public string LongDescription { get; }
-    public string LongDescriptionDisplay => string.IsNullOrWhiteSpace(LongDescription) ? "No description available" : LongDescription;
+    public string LongDescriptionDisplay
+    {
+        get
+        {
+            var description = string.IsNullOrWhiteSpace(LongDescription) ? "No description available" : LongDescription;
+            var sourceDisplay = DescriptionSourceDisplay;
+            return string.IsNullOrWhiteSpace(sourceDisplay)
+                ? description
+                : $"{description}\n\nSources:\n{sourceDisplay}";
+        }
+    }
     public Visibility HasDescription => string.IsNullOrEmpty(ShortDescription) ? Visibility.Collapsed : Visibility.Visible;
     public bool HasBookshelfImage => !string.IsNullOrWhiteSpace(BookshelfImagePath) && File.Exists(BookshelfImagePath);
     public string? SpineImagePath { get; }
@@ -478,6 +515,47 @@ internal sealed class BookDisplay
     public BitmapImage? SpineImage { get; }
     public string LocationName { get; }
     public string LocationDisplay => string.IsNullOrEmpty(LocationName) ? "" : $"📍 {LocationName}";
+    public bool IsDuplicate { get; }
+    public Visibility DuplicateVisibility => IsDuplicate ? Visibility.Visible : Visibility.Collapsed;
+    public bool IsDescriptionGrounded { get; }
+    public string? DescriptionSourcesJson { get; }
+    public Visibility GroundedVisibility => IsDescriptionGrounded ? Visibility.Visible : Visibility.Collapsed;
     public string CreatedAtDisplay { get; }
     public string DetectionLabel => DetectionIndex.HasValue ? $"#{DetectionIndex}" : "";
+
+    private string DescriptionSourceDisplay
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(DescriptionSourcesJson))
+            {
+                return string.Empty;
+            }
+
+            try
+            {
+                var sources = JsonSerializer.Deserialize<List<DescriptionSourceDisplay>>(DescriptionSourcesJson);
+                if (sources == null || sources.Count == 0)
+                {
+                    return string.Empty;
+                }
+
+                return string.Join(
+                    "\n",
+                    sources
+                        .Where(source => !string.IsNullOrWhiteSpace(source.Url))
+                        .Select(source => $"- {source.Provider}: {source.Url}"));
+            }
+            catch (JsonException)
+            {
+                return string.Empty;
+            }
+        }
+    }
+}
+
+internal sealed class DescriptionSourceDisplay
+{
+    public string? Provider { get; set; }
+    public string? Url { get; set; }
 }
