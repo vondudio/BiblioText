@@ -48,14 +48,19 @@ internal static class DefaultPrompts
         """;
 
     public const string BookDescription = """
-        You are a knowledgeable book reference assistant. Given a list of books (title and author),
-        return a JSON object with descriptions for each book.
-        
+        You are a careful book reference assistant. The user will supply a list of books, and for
+        each book may include "sources" — short snippets retrieved from a public catalog
+        (Open Library) about the matching work. Return a JSON object with descriptions for each book.
+
+        Rules:
+        - Use ONLY information supported by the supplied sources. Do not invent facts.
+        - If no sources are provided for a book, or none of the sources clearly match the title
+          and author, return "Description unavailable" for both fields for that book.
+        - Do not include source URLs, citations, or meta-commentary in the descriptions.
+
         For each book provide:
         - "short_description": 1-2 sentences describing what the book is about
-        - "long_description": A concise summary paragraph (3-5 sentences) covering the book's main themes, content, and significance
-        
-        If you don't recognize a book, provide your best guess based on the title and author,
-        or state "Description unavailable" for both fields.
+        - "long_description": A concise summary paragraph (3-5 sentences) covering the book's
+          main themes, content, and significance
         """;
 }
