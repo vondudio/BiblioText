@@ -20,7 +20,7 @@ public partial class App : Application
     protected override async void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
     {
         var services = new ServiceCollection();
-        services.AddSingleton<ISettingsStore, CompositeSettingsStore>();
+        services.AddSingleton<ISettingsStore>(_ => new CompositeSettingsStore());
         services.AddSingleton<SqliteLibraryRepository>();
         services.AddSingleton<ILibraryRepository>(sp => sp.GetRequiredService<SqliteLibraryRepository>());
         services.AddSingleton<IBookTitleExtractor, AzureOpenAiTitleExtractor>();
