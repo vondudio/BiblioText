@@ -408,32 +408,24 @@
             BorderBrush="{ThemeResource SurfaceStrokeColorDefaultBrush}"
             BorderThickness="0,1,0,0">
             <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
                 <TextBlock
-                    Grid.Column="0"
                     x:Name="ScanStatusText"
                     FontSize="12"
                     Opacity="0.8"
                     VerticalAlignment="Center"
+                    HorizontalAlignment="Stretch"
+                    Margin="0,0,220,0"
                     TextTrimming="CharacterEllipsis"
                     Text="Ready"
                     AutomationProperties.Name="Scan status" />
-                <StackPanel
-                    Grid.Column="1"
-                    Orientation="Horizontal"
+                <TextBlock
+                    x:Name="DetectionCountText"
+                    FontSize="12"
+                    Opacity="0.8"
                     VerticalAlignment="Center"
-                    Margin="12,0,0,0">
-                    <TextBlock
-                        x:Name="DetectionCountText"
-                        FontSize="12"
-                        Opacity="0.8"
-                        VerticalAlignment="Center"
-                        Text=""
-                        AutomationProperties.Name="Detection and selection counts" />
-                </StackPanel>
+                    HorizontalAlignment="Right"
+                    Text=""
+                    AutomationProperties.Name="Detection and selection counts" />
             </Grid>
         </Border>
     </Grid>
