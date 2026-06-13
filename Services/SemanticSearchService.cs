@@ -83,8 +83,11 @@ internal sealed class SemanticSearchService
 
     /// <summary>
     /// Search for books by semantic query. Returns matching book IDs.
+    /// The Windows AppContentIndex caps each GetNextMatches call at ~200,
+    /// so this method pages until either the index is exhausted or
+    /// <paramref name="maxResults"/> is reached.
     /// </summary>
-    public async Task<List<int>> SearchAsync(string query, int maxResults = 20)
+    public async Task<List<int>> SearchAsync(string query, int maxResults = 1000)
     {
         if (_indexer == null || !_isAvailable || string.IsNullOrWhiteSpace(query))
             return new List<int>();
@@ -94,13 +97,28 @@ internal sealed class SemanticSearchService
             return await Task.Run(() =>
             {
                 var textQuery = _indexer.CreateTextQuery(query);
-                var matches = textQuery.GetNextMatches(maxResults);
                 var bookIds = new List<int>();
-                foreach (var match in matches)
+                const int pageSize = 200;
+                while (bookIds.Count < maxResults)
                 {
-                    if (int.TryParse(match.ContentId, out int id))
+                    int remaining = maxResults - bookIds.Count;
+                    int request = remaining < pageSize ? remaining : pageSize;
+                    var matches = textQuery.GetNextMatches(request);
+                    if (matches == null || matches.Count == 0)
                     {
-                        bookIds.Add(id);
+                        break;
+                    }
+                    foreach (var match in matches)
+                    {
+                        if (int.TryParse(match.ContentId, out int id))
+                        {
+                            bookIds.Add(id);
+                        }
+                    }
+                    if (matches.Count < request)
+                    {
+                        // Index exhausted before we hit the cap.
+                        break;
                     }
                 }
                 return bookIds;
