@@ -1,11 +1,35 @@
 # BiblioText - Copilot Instructions
 
+## Workflow (single-user dev, no team)
+
+This is a one-developer project. The user runs the app from **Visual Studio**, with the
+solution open at `C:\Users\guyanderson\source\velvet\YOLO_Object_DetectionSample`.
+Sessions usually live in a different worktree (`copilot-worktrees\...`). Two rules
+follow from that:
+
+- **Don't propose worktree branching strategies, stacked PRs, or "let's keep this
+  isolated."** Single user, single branch flow. Commit on whatever branch the
+  session is on and push.
+- **Always sync velvet after pushing.** When you commit & push from the worktree,
+  immediately run in the velvet checkout (no need to ask first):
+  ```powershell
+  Push-Location C:\Users\guyanderson\source\velvet\YOLO_Object_DetectionSample
+  git fetch origin
+  git reset --hard origin/<current-branch>
+  Pop-Location
+  ```
+  Otherwise the VS instance the user is staring at keeps showing stale code and
+  they have to ask "where is this, not running from VS."
+
 ## Build & Run
 
-- **Build**: `dotnet build BiblioText.csproj -c Debug -p:Platform=ARM64`
-- **Platform**: This is an ARM64 WinUI 3 / .NET 9 desktop app. Always use `-p:Platform=ARM64`.
-- **Run**: Launch from Visual Studio or `dotnet run` (requires ARM64 platform).
-- The project file is `BiblioText.csproj` (renamed from the original sample).
+- **Build**: `dotnet build BiblioText.csproj -c Debug -p:Platform=ARM64 --nologo -v:m`
+- **Platform**: ARM64 WinUI 3 / .NET 9 desktop app. Always use `-p:Platform=ARM64` —
+  the project will not load on x64/AnyCPU.
+- **Run**: User launches from Visual Studio (F5). `dotnet run` works but is rarely
+  the right answer — the user wants to debug in VS.
+- Project file: `BiblioText.csproj` (renamed from the original sample).
+
 
 ## Architecture
 
@@ -52,6 +76,85 @@ The title extraction API returns results as "Title, Author" (comma-separated). T
 - Model: GPT-5.4 (vision capable)
 - Use `max_completion_tokens` not `max_tokens` (deprecated parameter)
 - JSON responses use snake_case — C# properties need `[JsonPropertyName("snake_case")]` attributes; `PropertyNameCaseInsensitive` does NOT handle underscores
+
+### Default prompts are versioned — bump `DefaultPrompts.CurrentVersion` on every change
+
+`Services/BookshelfAnalysisPrompt.cs` defines `DefaultPrompts.SpineExtraction`,
+`BookshelfAnalysisSystem`, `BookshelfAnalysisUser`, `BookDescription`. The
+Settings UI shows `settings.<Foo>Prompt ?? DefaultPrompts.<Foo>` — so once a user
+has saved any value (or persisted one from an older build), the in-source default
+is masked forever.
+
+`CompositeSettingsStore.Load` auto-migrates: if `AppSettings.PromptsVersion <
+DefaultPrompts.CurrentVersion`, it nulls all four prompt overrides so the new
+defaults take effect, then `Save` stamps the new version.
+
+**Whenever you change a default prompt, bump `DefaultPrompts.CurrentVersion`.**
+Otherwise the user's old saved prompt is what runs at runtime AND what the
+Settings editor displays — the new default is invisible.
+
+### Metadata enrichment pipeline (multi-provider → AI synthesis)
+
+The description generation flow is fanned out across three providers in parallel,
+not a fallback chain:
+
+1. `CompositeMetadataLookupService` runs Google Books, Wikipedia, and Open
+   Library concurrently via `Task.WhenAll`. Per-provider failure is isolated
+   (`SafeLookupAsync` catches HttpRequestException / JsonException /
+   TaskCanceledException). Union is aggregated and sorted by `MatchScore`.
+2. `BookDescriptionService` passes those snippets as `sources` to Azure OpenAI,
+   which synthesizes the final short + long descriptions in a single call. When
+   all providers return empty, a synthetic `BookMetadataSource { Provider="AI" }`
+   is injected so the badge system renders an "AI" chip.
+3. Sources are serialized to `books.description_sources_json`. The Library page
+   renders one badge per provider (`G`/`W`/`OL`/`AI`).
+
+Provider-specific gotchas:
+
+- **Google Books**: API key is **required** (anonymous quota = 0). Set via
+  `Settings → Book Metadata Providers` (stored DPAPI-encrypted in
+  `AppSettings.GoogleBooksApiKey`) or `GOOGLE_BOOKS_API_KEY` env var. Service
+  returns `[]` silently if no key.
+- **Wikipedia**: Free, no key. Must use `action=query&list=search` (relevance
+  ranker), **not** `action=opensearch` (prefix matcher — concatenating
+  "Title Author" returns garbage like "Don Herbert" for "Dune Herbert").
+  Prefer page titles suffixed `(novel)/(book)/(memoir)/(play)/(poem)` when
+  present.
+- **Open Library**: Metadata-only — do not re-add the `/works/{key}.json`
+  description hop, it produces noisy markdown blobs. Use it for covers,
+  ratings, ISBN, subjects, first sentence.
+
+### Layered Images in a Grid cell need explicit Visibility on every layer
+
+When stacking `<Image>` elements in the same Grid cell (e.g. cover + spine
+fallback in the Library / Review thumbnails), **every layer must have a
+`Visibility` binding**. A null `Source` doesn't keep WinUI from painting the
+empty image — the topmost declared Image will hide everything underneath it.
+The library thumbnail bug went unnoticed because the spine `<Image>` was
+declared after the cover with no Visibility binding, so it always painted over
+a perfectly good Google Books / OL cover URL. Pattern to follow:
+
+```xml
+<Image Source="{Binding FallbackImage}" Visibility="{Binding FallbackVisibility}" />
+<Image Source="{Binding PrimaryImage}"  Visibility="{Binding PrimaryVisibility}" />
+```
+with `PrimaryVisibility` Visible iff `PrimaryImage != null`, and `FallbackVisibility`
+the inverse.
+
+### DI registration of ISettingsStore
+
+Register the composite store as a **concrete instance**, not a factory that
+re-resolves the same interface:
+
+```csharp
+services.AddSingleton<ISettingsStore>(_ => new CompositeSettingsStore());
+```
+
+`CompositeSettingsStore`'s parameterless ctor wires up `DpapiSettingsStore` →
+`EnvironmentSettingsStore` internally. Asking DI to inject `ISettingsStore` into
+its own ctor causes `InvalidOperationException: A circular dependency was
+detected for the service of type 'BiblioText.Settings.ISettingsStore'` at app
+startup.
 
 ## Namespace & Paths
 
