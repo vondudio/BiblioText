@@ -8,12 +8,22 @@ namespace BiblioText.Services;
 internal static class DefaultPrompts
 {
     public const string SpineExtraction = """
-        Analyze this book spine image. Return a JSON object with exactly these fields:
+        You are reading a single book spine in an image. Return a JSON object with exactly these fields:
         {"title": "Book Title", "author": "Author Name", "confidence": 0.95}
-        - title: the book title visible on the spine
-        - author: the author name if visible, or "" if not
-        - confidence: a number 0.0 to 1.0 indicating how confident you are in the reading (1.0 = clearly readable, 0.0 = unreadable)
-        If this is not a book spine or text is completely unreadable, return {"title": "unknown", "author": "", "confidence": 0.0}
+        
+        Rules — read carefully:
+        - title: the book title that is CLEARLY and FULLY visible on the spine. Do not guess.
+        - author: the author name only if CLEARLY visible on the spine, otherwise "".
+        - confidence: 0.0 to 1.0 reflecting how legible and complete the text is
+          (1.0 = clean, complete, unambiguous; 0.5 = partially obscured but readable;
+           <= 0.3 = blurry, cropped, partial spine, or you had to infer).
+        - If the image shows only PART of a book spine (cut off at top/bottom/sides), the spine
+          is blurry, the text is too small or rotated to read confidently, the image is not a
+          book spine, OR you cannot read the title with high confidence, return:
+          {"title": "Unknown", "author": "", "confidence": 0.0}
+        - Never guess a title from a partial word, a series name alone, a publisher logo,
+          or general appearance. When in doubt, return Unknown.
+        
         Return ONLY the JSON object, no markdown formatting.
         """;
 
@@ -21,13 +31,19 @@ internal static class DefaultPrompts
         You are a precise book-spine reader. You analyze photographs of bookshelves and identify
         every fully visible book spine. You return structured JSON with the detected books.
         
-        Rules:
-        - Only include books whose spine text is fully visible and readable.
-        - Ignore partially hidden books, decorative items, and non-book objects.
-        - For each book, extract the title and author if visible on the spine.
-        - If the author is not visible, set it to null.
+        Rules — read carefully:
+        - Only include books whose spine text is FULLY visible and CLEARLY readable.
+        - Skip any spine that is partially hidden, cropped at the edge of the image, blurry,
+          rotated unreadably, or where you cannot read the title with high confidence.
+        - Skip decorative items, bookends, and non-book objects.
+        - For each book, extract the title exactly as printed. If the author is not clearly
+          visible on the spine, set it to null. Do not guess authors from titles alone.
         - Order books from left to right (or top to bottom for horizontal shelves).
-        - Set confidence to a value between 0.0 and 1.0 based on text legibility.
+        - Set confidence between 0.0 and 1.0 based on text legibility
+          (1.0 = clean and unambiguous; 0.5 = partially obscured but readable;
+           <= 0.3 = uncertain — prefer to omit the book entirely).
+        - Never invent a title from a publisher logo, series mark, or partial word.
+          When in doubt, omit the spine rather than guess.
         """;
 
     public const string BookshelfAnalysisUser = """

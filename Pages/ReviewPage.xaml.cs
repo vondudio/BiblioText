@@ -245,98 +245,107 @@ public sealed partial class ReviewPage : Page
         }
     }
 
+    private bool _isSaving;
+
     private async void SendToLibraryButton_Click(object sender, RoutedEventArgs e)
     {
-        var selected = ReviewList.SelectedItems.OfType<ReviewCandidate>().ToList();
-        if (selected.Count == 0)
+        if (_isSaving) return;
+        _isSaving = true;
+        SendToLibraryButton.IsEnabled = false;
+        try
         {
-            return;
-        }
+            var selectedAll = ReviewList.SelectedItems.OfType<ReviewCandidate>().ToList();
+            // Belt-and-suspenders: never save unknown/illegible spines even if user selected one.
+            var selected = selectedAll
+                .Where(c => !IsUnknownTitle(StringOr(c.EditedTitle, c.DetectedTitle))
+                         || !string.IsNullOrWhiteSpace(StringOr(c.EditedAuthor, c.DetectedAuthor)))
+                .ToList();
 
-        var repo = App.LibraryRepository;
-        if (repo == null)
-        {
-            var dialog = new ContentDialog
+            int skippedUnknown = selectedAll.Count - selected.Count;
+            if (selected.Count == 0)
             {
-                Title = "Not configured",
-                Content = "Library repository is not initialized. Check app startup.",
-                CloseButtonText = "OK",
-                XamlRoot = this.XamlRoot
-            };
-            await dialog.ShowAsync();
-            return;
-        }
-
-        int? locationId = (LocationDropdown.SelectedItem as Location)?.Id;
-        string? sourceImagePath = _currentScanIndex >= 0 && _currentScanIndex < _scanQueue.Count
-            ? _scanQueue[_currentScanIndex].SourceImagePath
-            : null;
-
-        int saved = 0;
-        var savedBooks = new List<Book>();
-        ReviewStatusText.Text = $"Saving {selected.Count} book(s)...";
-        foreach (var candidate in selected)
-        {
-            var book = new Book
-            {
-                Title = string.IsNullOrWhiteSpace(candidate.EditedTitle) ? candidate.DetectedTitle : candidate.EditedTitle,
-                Author = string.IsNullOrWhiteSpace(candidate.EditedAuthor) ? candidate.DetectedAuthor : candidate.EditedAuthor,
-                LocationId = locationId,
-                DetectionIndex = candidate.Index > 0 ? candidate.Index : null,
-                BookshelfImagePath = sourceImagePath,
-                CreatedAt = DateTime.UtcNow
-            };
-
-            // Save spine image if crop is available
-            if (candidate.CropJpeg != null && candidate.CropJpeg.Length > 0)
-            {
-                var spinesFolder = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "BiblioText", "spines");
-                Directory.CreateDirectory(spinesFolder);
-                var spinePath = Path.Combine(spinesFolder, $"spine_{DateTime.UtcNow:yyyyMMdd_HHmmss}_{saved}.jpg");
-                await File.WriteAllBytesAsync(spinePath, candidate.CropJpeg);
-                book.SpineImagePath = spinePath;
+                ReviewStatus.Text = skippedUnknown > 0
+                    ? $"Skipped {skippedUnknown} unknown spine(s). Nothing to save."
+                    : "Select at least one book to send to the library.";
+                return;
             }
 
-            await repo.AddBookAsync(book);
-            savedBooks.Add(book);
-            saved++;
-        }
-
-        // Remove saved candidates from the list
-        foreach (var candidate in selected)
-        {
-            _candidates.Remove(candidate);
-        }
-
-        // Batch fetch descriptions from AI
-        await FetchAndStoreDescriptionsAsync(savedBooks, repo);
-
-        // Remove this scan set if all candidates are processed
-        if (_candidates.Count == 0 && _currentScanIndex >= 0 && _currentScanIndex < _scanQueue.Count)
-        {
-            _scanQueue.RemoveAt(_currentScanIndex);
-            if (_scanQueue.Count == 0)
+            var repo = App.LibraryRepository;
+            var saveService = App.Services?.GetService(typeof(IReviewApplicationService)) as IReviewApplicationService;
+            if (repo == null || saveService == null)
             {
-                _currentScanIndex = -1;
-                ReviewStatus.Text = "All books saved! Go to the Library tab to view them.";
-                ReviewList.Visibility = Visibility.Collapsed;
-                CancelButton.Visibility = Visibility.Collapsed;
+                var dialog = new ContentDialog
+                {
+                    Title = "Not configured",
+                    Content = "Library repository is not initialized. Check app startup.",
+                    CloseButtonText = "OK",
+                    XamlRoot = this.XamlRoot
+                };
+                await dialog.ShowAsync();
+                return;
+            }
+
+            int? locationId = (LocationDropdown.SelectedItem as Location)?.Id;
+            string? sourceImagePath = _currentScanIndex >= 0 && _currentScanIndex < _scanQueue.Count
+                ? _scanQueue[_currentScanIndex].SourceImagePath
+                : null;
+
+            ReviewStatusText.Text = $"Saving {selected.Count} book(s)...";
+
+            ReviewSaveResult result;
+            try
+            {
+                result = await saveService.SaveAcceptedAsync(selected, locationId, sourceImagePath);
+            }
+            catch (Exception saveEx)
+            {
+                ReviewStatusText.Text = $"Save failed: {saveEx.Message}";
+                return;
+            }
+
+            // Remove saved candidates from the list (use the actually-saved subset)
+            foreach (var candidate in result.SavedCandidates)
+            {
+                _candidates.Remove(candidate);
+            }
+
+            // Batch fetch descriptions from AI
+            await FetchAndStoreDescriptionsAsync(result.SavedBooks, repo);
+
+            // Remove this scan set if all candidates are processed
+            if (_candidates.Count == 0 && _currentScanIndex >= 0 && _currentScanIndex < _scanQueue.Count)
+            {
+                _scanQueue.RemoveAt(_currentScanIndex);
+                if (_scanQueue.Count == 0)
+                {
+                    _currentScanIndex = -1;
+                    ReviewStatus.Text = "All books saved! Go to the Library tab to view them.";
+                    ReviewList.Visibility = Visibility.Collapsed;
+                    CancelButton.Visibility = Visibility.Collapsed;
+                }
+                else
+                {
+                    if (_currentScanIndex >= _scanQueue.Count)
+                        _currentScanIndex = _scanQueue.Count - 1;
+                    DisplayCurrentScanSet();
+                }
+                UpdateScanNavigation();
             }
             else
             {
-                if (_currentScanIndex >= _scanQueue.Count)
-                    _currentScanIndex = _scanQueue.Count - 1;
-                DisplayCurrentScanSet();
+                var dupNote = result.DuplicateCount > 0 ? $" ({result.DuplicateCount} flagged as duplicate)" : "";
+                var skipNote = skippedUnknown > 0 ? $" (skipped {skippedUnknown} unknown)" : "";
+                ReviewStatus.Text = $"Saved {result.SavedBooks.Count} book(s) to library{dupNote}{skipNote}. {_candidates.Count} remaining.";
             }
-            UpdateScanNavigation();
         }
-        else
+        finally
         {
-            ReviewStatus.Text = $"Saved {saved} book(s) to library. {_candidates.Count} remaining.";
+            _isSaving = false;
+            SendToLibraryButton.IsEnabled = true;
         }
     }
+
+    private static string StringOr(string? a, string? b) => string.IsNullOrWhiteSpace(a) ? (b ?? "") : a;
 
     private async Task FetchAndStoreDescriptionsAsync(List<Book> books, Persistence.ILibraryRepository repo)
     {
@@ -354,7 +363,8 @@ public sealed partial class ReviewPage : Page
 
             ReviewStatusText.Text = $"Fetching descriptions for {books.Count} book(s)...";
 
-            var descService = new BookDescriptionService(settingsStore);
+            var descService = (App.Services?.GetService(typeof(BookDescriptionService)) as BookDescriptionService)
+                              ?? new BookDescriptionService(settingsStore);
             var bookList = books.Select(b => (b.Id, b.Title, b.Author)).ToList();
             var descriptionResult = await descService.GetDescriptionsResultAsync(bookList);
             if (!descriptionResult.IsSuccess)

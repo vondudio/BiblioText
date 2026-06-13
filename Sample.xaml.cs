@@ -821,8 +821,15 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         await ActivateImageAsync(_images[next]);
     }
 
+    private int _isExtracting;
+    private int _isAnalyzing;
+
     private async void ExtractButton_Click(object sender, RoutedEventArgs e)
     {
+        if (System.Threading.Interlocked.Exchange(ref _isExtracting, 1) == 1) return;
+        ExtractButton.IsEnabled = false;
+        try
+        {
         if (_activeImage == null || _currentModel == null)
         {
             return;
@@ -943,6 +950,12 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         {
             item.Dispose();
         }
+        }
+        finally
+        {
+            System.Threading.Interlocked.Exchange(ref _isExtracting, 0);
+            ExtractButton.IsEnabled = _activeImage != null;
+        }
     }
 
     private static string SanitizeForPath(string s)
@@ -954,6 +967,10 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
 
     private async void AiAnalyzeButton_Click(object sender, RoutedEventArgs e)
     {
+        if (System.Threading.Interlocked.Exchange(ref _isAnalyzing, 1) == 1) return;
+        AiAnalyzeButton.IsEnabled = false;
+        try
+        {
         if (_activeImage == null) return;
 
         var workflow = App.WorkflowService;
@@ -1032,6 +1049,12 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         catch (Exception ex)
         {
             ScanStatusText.Text = $"AI analysis failed: {ex.Message}";
+        }
+        }
+        finally
+        {
+            System.Threading.Interlocked.Exchange(ref _isAnalyzing, 0);
+            AiAnalyzeButton.IsEnabled = _activeImage != null;
         }
     }
 
