@@ -109,7 +109,7 @@ internal static class ModelRegistry
             InputHeight: 640,
             Layout: TensorLayout.Nchw,
             Labels: CocoLabels.Labels,
-            DefaultConfidence: 0.25f),
+            DefaultConfidence: 0.35f),
 
         new ModelInfo(
             Id: "yolo26n-o2m",
@@ -205,30 +205,31 @@ internal static class ModelRegistry
     public static IReadOnlyList<ModelInfo> Available(string modelsDirectory) =>
         All.Where(m => m.ExistsIn(modelsDirectory)).ToArray();
 
-    /// <summary>Default model for viewing/display — prefers segmentation for visual overlay.</summary>
+    /// <summary>Default model for viewing/display — YOLO26 large E2E for accurate boxes,
+    /// drawn as an interactive XAML overlay rather than baked into pixels.</summary>
     public static ModelInfo? DefaultForViewing(string modelsDirectory)
     {
         var available = Available(modelsDirectory);
         if (available.Count == 0) return null;
 
-        // Prefer YOLO26 medium SEG for visual display
-        return available.FirstOrDefault(m => m.Id == "yolo26m-seg")
-            ?? available.FirstOrDefault(m => m.Head == ModelHead.Yolo26Segmentation)
+        return available.FirstOrDefault(m => m.Id == "yolo26l")
             ?? available.FirstOrDefault(m => m.Id == "yolo26m")
             ?? available.FirstOrDefault(m => m.Head == ModelHead.Yolo26EndToEnd)
+            ?? available.FirstOrDefault(m => m.Id == "yolo26l-seg")
+            ?? available.FirstOrDefault(m => m.Head == ModelHead.Yolo26Segmentation)
             ?? available[0];
     }
 
-    /// <summary>Default model for clipping/AI extraction — prefers bounding box model for clean crops.</summary>
+    /// <summary>Default model for clipping/AI extraction — same as viewing now that the
+    /// overlay drives cropping; kept as a fallback when no cached detection exists.</summary>
     public static ModelInfo? DefaultForClipping(string modelsDirectory)
     {
         var available = Available(modelsDirectory);
         if (available.Count == 0) return null;
 
-        // Prefer YOLO26 medium E2E (bounding boxes) for clipping
-        return available.FirstOrDefault(m => m.Id == "yolo26m")
+        return available.FirstOrDefault(m => m.Id == "yolo26l")
+            ?? available.FirstOrDefault(m => m.Id == "yolo26m")
             ?? available.FirstOrDefault(m => m.Head == ModelHead.Yolo26EndToEnd)
-            ?? available.FirstOrDefault(m => m.Id == "yolo26m-seg")
             ?? available[0];
     }
 
