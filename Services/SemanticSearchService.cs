@@ -129,4 +129,40 @@ internal sealed class SemanticSearchService
             return new List<int>();
         }
     }
+
+    /// <summary>
+    /// Re-add every supplied book to the AppContentIndex. Used at startup to
+    /// catch books saved before the indexer was wired up, or whose
+    /// IndexBookAsync call failed transiently. AddOrUpdate is idempotent, so
+    /// calling this on an already-indexed library is harmless.
+    /// </summary>
+    public async Task ReindexAllAsync(IEnumerable<(int Id, string Title, string? Author, string? LongDescription)> books)
+    {
+        if (_indexer == null || !_isAvailable) return;
+
+        try
+        {
+            await Task.Run(() =>
+            {
+                foreach (var b in books)
+                {
+                    try
+                    {
+                        var searchableText = $"{b.Title}. {b.Author ?? ""}. {b.LongDescription ?? ""}";
+                        var content = AppManagedIndexableAppContent.CreateFromString(
+                            b.Id.ToString(), searchableText);
+                        _indexer.AddOrUpdate(content);
+                    }
+                    catch
+                    {
+                        // Skip any one book that fails; don't abort the sweep.
+                    }
+                }
+            });
+        }
+        catch
+        {
+            // Silently fail — background sweep, non-critical.
+        }
+    }
 }

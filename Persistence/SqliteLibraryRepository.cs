@@ -147,6 +147,124 @@ public sealed class SqliteLibraryRepository : ILibraryRepository, IDisposable
             CREATE INDEX IF NOT EXISTS idx_books_duplicate ON books(is_duplicate);
             """;
         await indexes.ExecuteNonQueryAsync();
+
+        await EnsureFtsAsync();
+    }
+
+    /// <summary>
+    /// Create the books_fts virtual table (FTS5), keep-in-sync triggers, and
+    /// backfill it from existing rows on first run. Safe to call repeatedly.
+    /// </summary>
+    private async Task EnsureFtsAsync()
+    {
+        // Create the virtual table. Uses the default unicode61 tokenizer
+        // (case-insensitive, accent-folding, diacritic stripping). Prefix
+        // indexes 2,3,4 keep partial-word queries cheap.
+        using (var cmd = _connection!.CreateCommand())
+        {
+            cmd.CommandText = """
+                CREATE VIRTUAL TABLE IF NOT EXISTS books_fts USING fts5(
+                    title,
+                    author,
+                    short_description,
+                    long_description,
+                    content='books',
+                    content_rowid='id',
+                    tokenize='unicode61 remove_diacritics 2',
+                    prefix='2 3 4'
+                );
+                """;
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        // Sync triggers (external-content pattern: the FTS index references
+        // the books table by rowid; we just push row events through it).
+        using (var cmd = _connection!.CreateCommand())
+        {
+            cmd.CommandText = """
+                CREATE TRIGGER IF NOT EXISTS books_ai AFTER INSERT ON books BEGIN
+                    INSERT INTO books_fts(rowid, title, author, short_description, long_description)
+                    VALUES (new.id, new.title, new.author, new.short_description, new.long_description);
+                END;
+                CREATE TRIGGER IF NOT EXISTS books_ad AFTER DELETE ON books BEGIN
+                    INSERT INTO books_fts(books_fts, rowid, title, author, short_description, long_description)
+                    VALUES('delete', old.id, old.title, old.author, old.short_description, old.long_description);
+                END;
+                CREATE TRIGGER IF NOT EXISTS books_au AFTER UPDATE ON books BEGIN
+                    INSERT INTO books_fts(books_fts, rowid, title, author, short_description, long_description)
+                    VALUES('delete', old.id, old.title, old.author, old.short_description, old.long_description);
+                    INSERT INTO books_fts(rowid, title, author, short_description, long_description)
+                    VALUES (new.id, new.title, new.author, new.short_description, new.long_description);
+                END;
+                """;
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        // Backfill if the FTS index is empty but books exist (first-run on an
+        // existing DB, or after a schema upgrade that recreated books_fts).
+        // For external-content FTS5 the canonical backfill idiom is the
+        // 'rebuild' command — INSERT...SELECT against an external-content
+        // table is unreliable. We gate on a stored version marker rather than
+        // COUNT(*), because COUNT on an external-content table reads through
+        // to the books table and would always equal the book count.
+        const int currentFtsVersion = 1;
+        int storedFtsVersion;
+        using (var cmd = _connection!.CreateCommand())
+        {
+            cmd.CommandText = "PRAGMA user_version;";
+            storedFtsVersion = Convert.ToInt32(await cmd.ExecuteScalarAsync() ?? 0);
+        }
+        if (storedFtsVersion < currentFtsVersion)
+        {
+            using (var cmd = _connection!.CreateCommand())
+            {
+                cmd.CommandText = "INSERT INTO books_fts(books_fts) VALUES('rebuild');";
+                await cmd.ExecuteNonQueryAsync();
+            }
+            using (var cmd = _connection!.CreateCommand())
+            {
+                cmd.CommandText = $"PRAGMA user_version = {currentFtsVersion};";
+                await cmd.ExecuteNonQueryAsync();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Convert a free-text search query into an FTS5 MATCH expression. Strips
+    /// reserved punctuation, drops tokens shorter than 2 chars, and appends
+    /// the prefix operator to each token so "gats" matches "gatsby".
+    /// Returns null if no usable tokens remain (caller should fall back to LIKE).
+    /// </summary>
+    private static string? BuildFtsQuery(string raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return null;
+        }
+
+        var tokens = new List<string>();
+        var sb = new System.Text.StringBuilder();
+        foreach (var ch in raw)
+        {
+            if (char.IsLetterOrDigit(ch))
+            {
+                sb.Append(ch);
+            }
+            else
+            {
+                if (sb.Length >= 2)
+                {
+                    tokens.Add(sb.ToString().ToLowerInvariant() + "*");
+                }
+                sb.Clear();
+            }
+        }
+        if (sb.Length >= 2)
+        {
+            tokens.Add(sb.ToString().ToLowerInvariant() + "*");
+        }
+
+        return tokens.Count == 0 ? null : string.Join(' ', tokens);
     }
 
     // Books
@@ -291,27 +409,100 @@ public sealed class SqliteLibraryRepository : ILibraryRepository, IDisposable
         try
         {
             EnsureConnected();
+
+            // For non-trivial searches we run BOTH FTS5 (relevance-ranked,
+            // prefix-matched, handles multi-token AND) and LIKE (substring,
+            // catches 'art' inside 'Heart'). Merged so FTS hits lead the
+            // result set and LIKE-only matches are appended after.
+            string? ftsExpr = string.IsNullOrWhiteSpace(searchQuery) ? null : BuildFtsQuery(searchQuery);
+            if (ftsExpr != null)
+            {
+                var ordered = new List<Book>();
+                var seen = new HashSet<int>();
+
+                // FTS leg
+                using (var ftsCmd = _connection!.CreateCommand())
+                {
+                    var sb = new System.Text.StringBuilder();
+                    sb.Append("SELECT b.* FROM books b JOIN books_fts f ON f.rowid = b.id ");
+                    sb.Append("WHERE books_fts MATCH @match ");
+                    ftsCmd.Parameters.AddWithValue("@match", ftsExpr);
+                    if (locationId.HasValue)
+                    {
+                        sb.Append("AND b.location_id = @locId ");
+                        ftsCmd.Parameters.AddWithValue("@locId", locationId.Value);
+                    }
+                    sb.Append("ORDER BY rank;");
+                    ftsCmd.CommandText = sb.ToString();
+
+                    try
+                    {
+                        using var reader = await ftsCmd.ExecuteReaderAsync();
+                        while (await reader.ReadAsync())
+                        {
+                            var book = ReadBook(reader);
+                            if (seen.Add(book.Id))
+                            {
+                                ordered.Add(book);
+                            }
+                        }
+                    }
+                    catch (SqliteException)
+                    {
+                        // Bad FTS expression: skip FTS leg, rely on LIKE.
+                    }
+                }
+
+                // LIKE leg (substring matches FTS prefix can miss)
+                using (var likeCmd = _connection!.CreateCommand())
+                {
+                    var sb = new System.Text.StringBuilder();
+                    sb.Append("SELECT * FROM books WHERE ");
+                    sb.Append("(title LIKE @search OR author LIKE @search OR short_description LIKE @search OR long_description LIKE @search) ");
+                    likeCmd.Parameters.AddWithValue("@search", $"%{searchQuery}%");
+                    if (locationId.HasValue)
+                    {
+                        sb.Append("AND location_id = @locId ");
+                        likeCmd.Parameters.AddWithValue("@locId", locationId.Value);
+                    }
+                    sb.Append("ORDER BY created_at DESC;");
+                    likeCmd.CommandText = sb.ToString();
+
+                    using var reader = await likeCmd.ExecuteReaderAsync();
+                    while (await reader.ReadAsync())
+                    {
+                        var book = ReadBook(reader);
+                        if (seen.Add(book.Id))
+                        {
+                            ordered.Add(book);
+                        }
+                    }
+                }
+
+                return ordered;
+            }
+
             using var cmd = _connection!.CreateCommand();
-            var where = new List<string>();
+            var whereClauses = new List<string>();
             if (!string.IsNullOrWhiteSpace(searchQuery))
             {
-                where.Add("(title LIKE @search OR author LIKE @search OR short_description LIKE @search OR long_description LIKE @search)");
+                whereClauses.Add("(title LIKE @search OR author LIKE @search OR short_description LIKE @search OR long_description LIKE @search)");
                 cmd.Parameters.AddWithValue("@search", $"%{searchQuery}%");
             }
             if (locationId.HasValue)
             {
-                where.Add("location_id=@locId");
+                whereClauses.Add("location_id=@locId");
                 cmd.Parameters.AddWithValue("@locId", locationId.Value);
             }
 
-            var whereClause = where.Count > 0 ? "WHERE " + string.Join(" AND ", where) : "";
+            var whereClause = whereClauses.Count > 0 ? "WHERE " + string.Join(" AND ", whereClauses) : "";
             cmd.CommandText = $"SELECT * FROM books {whereClause} ORDER BY created_at DESC;";
 
             var books = new List<Book>();
-            using var reader = await cmd.ExecuteReaderAsync();
-            while (await reader.ReadAsync())
+            using var unfilteredReader = await cmd.ExecuteReaderAsync();
+            while (await unfilteredReader.ReadAsync())
             {
-                books.Add(ReadBook(reader));
+                books.Add(ReadBook(unfilteredReader));
             }
             return books;
         }

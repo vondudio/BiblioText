@@ -1,4 +1,6 @@
 using System;
+using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.Extensions.DependencyInjection;
 using BiblioText.Settings;
@@ -51,6 +53,25 @@ public partial class App : Application
         var searchService = Services.GetRequiredService<SemanticSearchService>();
         await searchService.InitializeAsync();
         SemanticSearchService = searchService;
+
+        // Background backfill: re-add every existing book to the semantic
+        // index. Catches books saved before the indexer was wired up (or
+        // before the user upgraded to a Windows build that supports
+        // AppContentIndex). AddOrUpdate is idempotent, so this is a no-op
+        // on already-indexed libraries.
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var all = await repo.GetBooksAsync();
+                await searchService.ReindexAllAsync(
+                    all.Select(b => (b.Id, b.Title, b.Author, b.LongDescription)));
+            }
+            catch
+            {
+                // Non-critical: search degrades gracefully if this fails.
+            }
+        });
 
         Window = new MainWindow();
         Window.Activate();
