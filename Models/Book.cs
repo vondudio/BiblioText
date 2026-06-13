@@ -19,5 +19,8 @@ public sealed class Book
     public DateTime CreatedAt { get; set; }
     public DateTime? ModifiedAt { get; set; }
     public bool IsDuplicate { get; set; }
+    public bool IsDescriptionGrounded { get; set; }
+    public string? DescriptionSourcesJson { get; set; }
+    public DateTime? DescriptionGeneratedAt { get; set; }
     public string? Notes { get; set; }
 }

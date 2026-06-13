@@ -64,6 +64,9 @@ public sealed class SqliteLibraryRepository : ILibraryRepository, IDisposable
                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
                 modified_at TEXT,
                 is_duplicate INTEGER NOT NULL DEFAULT 0,
+                is_description_grounded INTEGER NOT NULL DEFAULT 0,
+                description_sources_json TEXT,
+                description_generated_at TEXT,
                 notes TEXT,
                 FOREIGN KEY (scan_id) REFERENCES scans(id),
                 FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE SET NULL
@@ -107,6 +110,24 @@ public sealed class SqliteLibraryRepository : ILibraryRepository, IDisposable
         {
             using var alter = _connection!.CreateCommand();
             alter.CommandText = "ALTER TABLE books ADD COLUMN long_description TEXT;";
+            await alter.ExecuteNonQueryAsync();
+        }
+        if (!columns.Contains("is_description_grounded"))
+        {
+            using var alter = _connection!.CreateCommand();
+            alter.CommandText = "ALTER TABLE books ADD COLUMN is_description_grounded INTEGER NOT NULL DEFAULT 0;";
+            await alter.ExecuteNonQueryAsync();
+        }
+        if (!columns.Contains("description_sources_json"))
+        {
+            using var alter = _connection!.CreateCommand();
+            alter.CommandText = "ALTER TABLE books ADD COLUMN description_sources_json TEXT;";
+            await alter.ExecuteNonQueryAsync();
+        }
+        if (!columns.Contains("description_generated_at"))
+        {
+            using var alter = _connection!.CreateCommand();
+            alter.CommandText = "ALTER TABLE books ADD COLUMN description_generated_at TEXT;";
             await alter.ExecuteNonQueryAsync();
         }
 
@@ -177,8 +198,8 @@ public sealed class SqliteLibraryRepository : ILibraryRepository, IDisposable
         using var cmd = _connection!.CreateCommand();
         cmd.Transaction = transaction;
         cmd.CommandText = """
-            INSERT INTO books (title, author, short_description, long_description, scan_id, location_id, spine_image_path, bookshelf_image_path, detection_index, created_at, is_duplicate, notes)
-            VALUES (@title, @author, @shortDesc, @longDesc, @scanId, @locationId, @spinePath, @bookshelfPath, @detectionIndex, @createdAt, @isDuplicate, @notes);
+            INSERT INTO books (title, author, short_description, long_description, scan_id, location_id, spine_image_path, bookshelf_image_path, detection_index, created_at, is_duplicate, is_description_grounded, description_sources_json, description_generated_at, notes)
+            VALUES (@title, @author, @shortDesc, @longDesc, @scanId, @locationId, @spinePath, @bookshelfPath, @detectionIndex, @createdAt, @isDuplicate, @isDescriptionGrounded, @descriptionSourcesJson, @descriptionGeneratedAt, @notes);
             SELECT last_insert_rowid();
             """;
         cmd.Parameters.AddWithValue("@title", book.Title);
@@ -192,6 +213,9 @@ public sealed class SqliteLibraryRepository : ILibraryRepository, IDisposable
         cmd.Parameters.AddWithValue("@detectionIndex", (object?)book.DetectionIndex ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@createdAt", book.CreatedAt.ToString("o"));
         cmd.Parameters.AddWithValue("@isDuplicate", book.IsDuplicate ? 1 : 0);
+        cmd.Parameters.AddWithValue("@isDescriptionGrounded", book.IsDescriptionGrounded ? 1 : 0);
+        cmd.Parameters.AddWithValue("@descriptionSourcesJson", (object?)book.DescriptionSourcesJson ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@descriptionGeneratedAt", book.DescriptionGeneratedAt.HasValue ? book.DescriptionGeneratedAt.Value.ToString("o") : DBNull.Value);
         cmd.Parameters.AddWithValue("@notes", (object?)book.Notes ?? DBNull.Value);
 
         var result = await cmd.ExecuteScalarAsync();
@@ -209,7 +233,9 @@ public sealed class SqliteLibraryRepository : ILibraryRepository, IDisposable
             cmd.CommandText = """
                 UPDATE books SET title=@title, author=@author, short_description=@shortDesc, long_description=@longDesc,
                     location_id=@locationId, spine_image_path=@spinePath, bookshelf_image_path=@bookshelfPath,
-                    detection_index=@detectionIndex, modified_at=@modifiedAt, is_duplicate=@isDuplicate, notes=@notes
+                    detection_index=@detectionIndex, modified_at=@modifiedAt, is_duplicate=@isDuplicate,
+                    is_description_grounded=@isDescriptionGrounded, description_sources_json=@descriptionSourcesJson,
+                    description_generated_at=@descriptionGeneratedAt, notes=@notes
                 WHERE id=@id;
                 """;
             cmd.Parameters.AddWithValue("@id", book.Id);
@@ -223,6 +249,9 @@ public sealed class SqliteLibraryRepository : ILibraryRepository, IDisposable
             cmd.Parameters.AddWithValue("@detectionIndex", (object?)book.DetectionIndex ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@modifiedAt", DateTime.UtcNow.ToString("o"));
             cmd.Parameters.AddWithValue("@isDuplicate", book.IsDuplicate ? 1 : 0);
+            cmd.Parameters.AddWithValue("@isDescriptionGrounded", book.IsDescriptionGrounded ? 1 : 0);
+            cmd.Parameters.AddWithValue("@descriptionSourcesJson", (object?)book.DescriptionSourcesJson ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@descriptionGeneratedAt", book.DescriptionGeneratedAt.HasValue ? book.DescriptionGeneratedAt.Value.ToString("o") : DBNull.Value);
             cmd.Parameters.AddWithValue("@notes", (object?)book.Notes ?? DBNull.Value);
             await cmd.ExecuteNonQueryAsync();
         }
@@ -471,6 +500,9 @@ public sealed class SqliteLibraryRepository : ILibraryRepository, IDisposable
             CreatedAt = DateTime.Parse(reader.GetString(reader.GetOrdinal("created_at"))),
             ModifiedAt = reader.IsDBNull(reader.GetOrdinal("modified_at")) ? null : DateTime.Parse(reader.GetString(reader.GetOrdinal("modified_at"))),
             IsDuplicate = reader.GetInt32(reader.GetOrdinal("is_duplicate")) == 1,
+            IsDescriptionGrounded = reader.GetInt32(reader.GetOrdinal("is_description_grounded")) == 1,
+            DescriptionSourcesJson = reader.IsDBNull(reader.GetOrdinal("description_sources_json")) ? null : reader.GetString(reader.GetOrdinal("description_sources_json")),
+            DescriptionGeneratedAt = reader.IsDBNull(reader.GetOrdinal("description_generated_at")) ? null : DateTime.Parse(reader.GetString(reader.GetOrdinal("description_generated_at"))),
             Notes = reader.IsDBNull(reader.GetOrdinal("notes")) ? null : reader.GetString(reader.GetOrdinal("notes"))
         };
     }
