@@ -407,12 +407,30 @@
             Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
             BorderBrush="{ThemeResource SurfaceStrokeColorDefaultBrush}"
             BorderThickness="0,1,0,0">
-            <TextBlock
-                x:Name="ScanStatusText"
-                FontSize="12"
-                Opacity="0.8"
-                Text="Ready"
-                AutomationProperties.Name="Scan status" />
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock
+                    Grid.Column="0"
+                    x:Name="ScanStatusText"
+                    FontSize="12"
+                    Opacity="0.8"
+                    VerticalAlignment="Center"
+                    TextTrimming="CharacterEllipsis"
+                    Text="Ready"
+                    AutomationProperties.Name="Scan status" />
+                <TextBlock
+                    Grid.Column="1"
+                    x:Name="DetectionCountText"
+                    FontSize="12"
+                    Opacity="0.8"
+                    VerticalAlignment="Center"
+                    Margin="12,0,0,0"
+                    Text=""
+                    AutomationProperties.Name="Detection and selection counts" />
+            </Grid>
         </Border>
     </Grid>
 </Page>

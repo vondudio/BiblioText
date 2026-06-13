@@ -1931,6 +1931,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         }
         _penBarrelPressed = false;
         _penPointerId = 0;
+        UpdateDetectionCountLabel();
     }
 
     private void RefreshBoxOverlay(CachedOutput cached)
@@ -1961,6 +1962,20 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
             var rect = BuildBoxRectangle(p);
             BoxOverlay.Children.Add(rect);
         }
+
+        UpdateDetectionCountLabel();
+    }
+
+    private void UpdateDetectionCountLabel()
+    {
+        if (_overlayCache == null || _overlayCache.BoxPredictions.Count == 0)
+        {
+            DetectionCountText.Text = string.Empty;
+            return;
+        }
+        int total = _overlayCache.BoxPredictions.Count(p => p?.Box != null);
+        int selected = _overlayCache.BoxPredictions.Count(p => p?.Box != null && !p.IsExcluded);
+        DetectionCountText.Text = $"Detections: {total}  \u2022  Selected: {selected}";
     }
 
     private static (double Width, double Height) GetSourcePixelSize(BitmapImage img)
@@ -2031,6 +2046,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         if (rect.Tag is not Prediction p) return;
         p.IsExcluded = !p.IsExcluded;
         ApplyExclusionVisual(rect, p.IsExcluded);
+        UpdateDetectionCountLabel();
         e.Handled = true;
     }
 
@@ -2312,6 +2328,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         BoxOverlay.Children.Add(rect);
         ExtractButton.IsEnabled = _overlayCache.BoxPredictions.Count(p => !p.IsExcluded) > 0;
         ScanStatusText.Text = $"Added manual box. Detections: {_overlayCache.BoxPredictions.Count}.";
+        UpdateDetectionCountLabel();
         if (source == DrawSource.Toggle) DrawBoxButton.IsChecked = false; // one-shot
     }
 }
