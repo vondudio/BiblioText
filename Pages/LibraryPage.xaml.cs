@@ -295,30 +295,34 @@ public sealed partial class LibraryPage : Page
         BookshelfOverlayScroller.ChangeView(0, 0, 1.0f, disableAnimation: true);
     }
 
-    private void DescriptionButton_Click(object sender, RoutedEventArgs e)
+    private async void DescriptionButton_Click(object sender, RoutedEventArgs e)
     {
-        if (TryGetBook(sender, out var book) is false || sender is not FrameworkElement target)
+        if (TryGetBook(sender, out var book) is false)
         {
             return;
         }
 
-        var stack = new StackPanel { Spacing = 10, MaxWidth = 520 };
+        var stack = new StackPanel { Spacing = 12 };
 
-        // Title header
-        stack.Children.Add(new TextBlock
+        // Author subhead (title goes in dialog Title)
+        if (!string.IsNullOrWhiteSpace(book.Author))
         {
-            Text = string.IsNullOrWhiteSpace(book.Author) ? book.Title : $"{book.Title} — {book.Author}",
-            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-            FontSize = 14,
-            TextWrapping = TextWrapping.WrapWholeWords
-        });
+            stack.Children.Add(new TextBlock
+            {
+                Text = book.Author,
+                FontStyle = Windows.UI.Text.FontStyle.Italic,
+                FontSize = 13,
+                Opacity = 0.75,
+                TextWrapping = TextWrapping.WrapWholeWords
+            });
+        }
 
-        // Long description as paragraphs (split on blank lines; if none, group by sentences)
+        // Long description as paragraphs
         var rich = new RichTextBlock
         {
             TextWrapping = TextWrapping.WrapWholeWords,
-            FontSize = 13,
-            LineHeight = 19
+            FontSize = 14,
+            LineHeight = 22
         };
 
         var body = string.IsNullOrWhiteSpace(book.LongDescription)
@@ -329,7 +333,7 @@ public sealed partial class LibraryPage : Page
         {
             var p = new Microsoft.UI.Xaml.Documents.Paragraph
             {
-                Margin = new Thickness(0, 0, 0, 8)
+                Margin = new Thickness(0, 0, 0, 10)
             };
             p.Inlines.Add(new Microsoft.UI.Xaml.Documents.Run { Text = paragraphText });
             rich.Blocks.Add(p);
@@ -345,33 +349,48 @@ public sealed partial class LibraryPage : Page
             {
                 Text = "Sources",
                 FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                FontSize = 11,
+                FontSize = 12,
                 Opacity = 0.7,
-                Margin = new Thickness(0, 4, 0, 0)
+                Margin = new Thickness(0, 6, 0, 0)
             });
             stack.Children.Add(new TextBlock
             {
                 Text = sourceDisplay,
-                FontSize = 11,
+                FontSize = 12,
                 Opacity = 0.6,
                 TextWrapping = TextWrapping.WrapWholeWords
             });
         }
 
-        var flyout = new Flyout
+        // Size the scroller to the current window so the full text is always
+        // reachable, regardless of how long the description is.
+        var window = App.Window;
+        var bounds = window?.Bounds;
+        var width = Math.Min(720.0, Math.Max(420.0, (bounds?.Width ?? 900) * 0.6));
+        var height = Math.Min(720.0, Math.Max(360.0, (bounds?.Height ?? 700) * 0.7));
+
+        var scroller = new ScrollViewer
         {
-            Content = new ScrollViewer
-            {
-                MaxWidth = 540,
-                MaxHeight = 480,
-                HorizontalScrollMode = ScrollMode.Disabled,
-                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                Padding = new Thickness(4),
-                Content = stack
-            }
+            HorizontalScrollMode = ScrollMode.Disabled,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            VerticalScrollMode = ScrollMode.Enabled,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            Width = width,
+            Height = height,
+            Padding = new Thickness(4, 0, 12, 0),
+            Content = stack
         };
 
-        flyout.ShowAt(target);
+        var dialog = new ContentDialog
+        {
+            Title = book.Title,
+            Content = scroller,
+            CloseButtonText = "Close",
+            DefaultButton = ContentDialogButton.Close,
+            XamlRoot = this.XamlRoot
+        };
+
+        await dialog.ShowAsync();
     }
 
     private static IEnumerable<string> SplitIntoParagraphs(string body)
@@ -628,6 +647,7 @@ internal sealed class BookDisplay
     public IReadOnlyList<ProviderBadge> ProviderBadges { get; }
     public string LocationName { get; }
     public string LocationDisplay => string.IsNullOrEmpty(LocationName) ? "" : $"📍 {LocationName}";
+    public Visibility LocationVisibility => string.IsNullOrEmpty(LocationName) ? Visibility.Collapsed : Visibility.Visible;
     public bool IsDuplicate { get; }
     public Visibility DuplicateVisibility => IsDuplicate ? Visibility.Visible : Visibility.Collapsed;
     public bool IsDescriptionGrounded { get; }
