@@ -317,6 +317,17 @@ public sealed partial class LibraryPage : Page
             });
         }
 
+        // Scanned date
+        if (!string.IsNullOrWhiteSpace(book.ScannedDisplay))
+        {
+            stack.Children.Add(new TextBlock
+            {
+                Text = book.ScannedDisplay,
+                FontSize = 12,
+                Opacity = 0.55
+            });
+        }
+
         // Long description as paragraphs
         var rich = new RichTextBlock
         {
@@ -603,6 +614,7 @@ internal sealed class BookDisplay
         IsDescriptionGrounded = book.IsDescriptionGrounded;
         DescriptionSourcesJson = book.DescriptionSourcesJson;
         CreatedAtDisplay = book.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd");
+        ScannedDisplay = $"Scanned {book.CreatedAt.ToLocalTime():yyyy-M-d}";
 
         if (!string.IsNullOrEmpty(SpineImagePath) && File.Exists(SpineImagePath))
         {
@@ -654,6 +666,7 @@ internal sealed class BookDisplay
     public string? DescriptionSourcesJson { get; }
     public Visibility GroundedVisibility => IsDescriptionGrounded ? Visibility.Visible : Visibility.Collapsed;
     public string CreatedAtDisplay { get; }
+    public string ScannedDisplay { get; }
     public string DetectionLabel => DetectionIndex.HasValue ? $"#{DetectionIndex}" : "";
 
     public string DescriptionSourceDisplayForDialog => DescriptionSourceDisplay;

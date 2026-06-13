@@ -111,7 +111,6 @@
                                 <ColumnDefinition Width="Auto" MinWidth="200" MaxWidth="280" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="100" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
 
@@ -230,10 +229,8 @@
                                 <TextBlock Text="ℹ" FontSize="14" />
                             </Button>
 
-                            <TextBlock Grid.Column="4" Text="{Binding CreatedAtDisplay}" VerticalAlignment="Center" Opacity="0.5" FontSize="12" />
-
                             <Button
-                                Grid.Column="5"
+                                Grid.Column="4"
                                 Padding="8,4"
                                 VerticalAlignment="Center"
                                 Background="Transparent"
