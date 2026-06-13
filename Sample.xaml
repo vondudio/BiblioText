@@ -42,7 +42,9 @@
                     Stretch="Uniform"
                     Width="{Binding ViewportWidth, ElementName=ImageScroller}"
                     Height="{Binding ViewportHeight, ElementName=ImageScroller}">
-                    <Image x:Name="DefaultImage" />
+                    <Image
+                        x:Name="DefaultImage"
+                        AutomationProperties.Name="Selected bookshelf scan image" />
                 </Viewbox>
             </ScrollViewer>
             <ProgressRing
@@ -63,7 +65,8 @@
                         MinWidth="180"
                         DisplayMemberPath="DisplayName"
                         SelectionChanged="ModelPicker_SelectionChanged"
-                        ToolTipService.ToolTip="Select model" />
+                        ToolTipService.ToolTip="Select model"
+                        AutomationProperties.Name="Detection model" />
                     <StackPanel
                         x:Name="ConfidencePanel"
                         Orientation="Horizontal"
@@ -71,7 +74,7 @@
                         VerticalAlignment="Center"
                         ToolTipService.ToolTip="Confidence threshold">
                         <TextBlock
-                            Text="Conf"
+                            Text="Confidence"
                             VerticalAlignment="Center"
                             Margin="4,0,0,0" />
                         <Slider
@@ -82,7 +85,8 @@
                             TickFrequency="0.1"
                             Width="240"
                             Value="0.20"
-                            ValueChanged="ConfidenceSlider_ValueChanged" />
+                            ValueChanged="ConfidenceSlider_ValueChanged"
+                            AutomationProperties.Name="Confidence threshold" />
                         <TextBox
                             x:Name="ConfidenceText"
                             Width="60"
@@ -92,7 +96,8 @@
                             VerticalAlignment="Center"
                             LostFocus="ConfidenceText_LostFocus"
                             KeyDown="ConfidenceText_KeyDown"
-                            ToolTipService.ToolTip="Type a value (0.05 - 0.95) and press Enter" />
+                            ToolTipService.ToolTip="Type a value (0.05 - 0.95) and press Enter"
+                            AutomationProperties.Name="Confidence threshold value" />
                         <StackPanel
                             Orientation="Vertical"
                             VerticalAlignment="Center"
@@ -104,7 +109,8 @@
                                 Padding="0"
                                 MinHeight="0"
                                 Click="ConfidenceUp_Click"
-                                ToolTipService.ToolTip="Increase 0.05">
+                                ToolTipService.ToolTip="Increase 0.05"
+                                AutomationProperties.Name="Increase confidence threshold">
                                 <FontIcon FontFamily="Segoe MDL2 Assets" FontSize="8" Glyph="&#xE70E;" />
                             </RepeatButton>
                             <RepeatButton
@@ -114,7 +120,8 @@
                                 Padding="0"
                                 MinHeight="0"
                                 Click="ConfidenceDown_Click"
-                                ToolTipService.ToolTip="Decrease 0.05">
+                                ToolTipService.ToolTip="Decrease 0.05"
+                                AutomationProperties.Name="Decrease confidence threshold">
                                 <FontIcon FontFamily="Segoe MDL2 Assets" FontSize="8" Glyph="&#xE70D;" />
                             </RepeatButton>
                         </StackPanel>
@@ -125,13 +132,15 @@
                             Content="Auto"
                             IsChecked="True"
                             ToolTipService.ToolTip="Automatically run detection when image loads"
-                            VerticalAlignment="Center" />
+                            VerticalAlignment="Center"
+                            AutomationProperties.Name="Automatically run detection when image loads" />
                         <Button
                             x:Name="RefreshDetectionButton"
                             Click="RefreshDetectionButton_Click"
                             ToolTipService.ToolTip="Re-run detection"
                             Padding="6,4"
-                            VerticalAlignment="Center">
+                            VerticalAlignment="Center"
+                            AutomationProperties.Name="Re-run detection">
                             <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE72C;" FontSize="14" />
                         </Button>
                     </StackPanel>
@@ -223,7 +232,8 @@
                                                     Source="{x:Bind Thumbnail}"
                                                     Stretch="UniformToFill"
                                                     HorizontalAlignment="Stretch"
-                                                    VerticalAlignment="Stretch" />
+                                                    VerticalAlignment="Stretch"
+                                                    AutomationProperties.Name="{x:Bind DisplayName}" />
                                             </Border>
                                             <TextBlock
                                                 Grid.Row="1"
@@ -247,7 +257,8 @@
                             Margin="0"
                             Background="Transparent"
                             BorderThickness="0"
-                            ToolTipService.ToolTip="Import one or more images">
+                            ToolTipService.ToolTip="Import one or more images"
+                            AutomationProperties.Name="Import one or more bookshelf images">
                             <Grid Width="120">
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="120" />
@@ -293,7 +304,8 @@
                             Margin="0"
                             Background="Transparent"
                             BorderThickness="0"
-                            ToolTipService.ToolTip="Capture photo from camera">
+                            ToolTipService.ToolTip="Capture photo from camera"
+                            AutomationProperties.Name="Capture photo from camera">
                             <Grid Width="120">
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="120" />
@@ -340,7 +352,8 @@
                             x:Name="RemoveButton"
                             Click="RemoveButton_Click"
                             IsEnabled="False"
-                            ToolTipService.ToolTip="Remove selected image">
+                            ToolTipService.ToolTip="Remove selected image"
+                            AutomationProperties.Name="Remove selected image">
                             <StackPanel Orientation="Horizontal" Spacing="6">
                                 <FontIcon FontFamily="Segoe MDL2 Assets" FontSize="14" Glyph="&#xE74D;" />
                                 <TextBlock Text="REMOVE" FontWeight="SemiBold" />
@@ -350,7 +363,8 @@
                             x:Name="ExtractButton"
                             Click="ExtractButton_Click"
                             IsEnabled="False"
-                            ToolTipService.ToolTip="Crop each detection and submit to the title-extraction stub (Azure OpenAI GPT-5.4)">
+                            ToolTipService.ToolTip="Crop each detection and submit to Azure OpenAI for title extraction"
+                            AutomationProperties.Name="Extract titles from detected book spines">
                             <StackPanel Orientation="Horizontal" Spacing="6">
                                 <FontIcon FontFamily="Segoe MDL2 Assets" FontSize="14" Glyph="&#xE8FA;" />
                                 <TextBlock Text="EXTRACT TITLES" FontWeight="SemiBold" />
@@ -360,7 +374,8 @@
                             x:Name="AiAnalyzeButton"
                             Click="AiAnalyzeButton_Click"
                             IsEnabled="False"
-                            ToolTipService.ToolTip="Send the full image to Azure OpenAI for bookshelf analysis (no YOLO needed)">
+                            ToolTipService.ToolTip="Send the full image to Azure OpenAI for bookshelf analysis"
+                            AutomationProperties.Name="Analyze full bookshelf image with AI">
                             <StackPanel Orientation="Horizontal" Spacing="6">
                                 <FontIcon FontFamily="Segoe MDL2 Assets" FontSize="14" Glyph="&#xE9D9;" />
                                 <TextBlock Text="AI ANALYZE" FontWeight="SemiBold" />
@@ -383,7 +398,8 @@
                 x:Name="ScanStatusText"
                 FontSize="12"
                 Opacity="0.8"
-                Text="Ready" />
+                Text="Ready"
+                AutomationProperties.Name="Scan status" />
         </Border>
     </Grid>
 </Page>

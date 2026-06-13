@@ -39,7 +39,8 @@
                     x:Name="PrevScanButton"
                     Click="PrevScanButton_Click"
                     ToolTipService.ToolTip="Previous scan"
-                    Padding="6,4">
+                    Padding="6,4"
+                    AutomationProperties.Name="Previous scan">
                     <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE76B;" FontSize="14" />
                 </Button>
                 <TextBlock
@@ -51,7 +52,8 @@
                     x:Name="NextScanButton"
                     Click="NextScanButton_Click"
                     ToolTipService.ToolTip="Next scan"
-                    Padding="6,4">
+                    Padding="6,4"
+                    AutomationProperties.Name="Next scan">
                     <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE76C;" FontSize="14" />
                 </Button>
             </StackPanel>
@@ -77,7 +79,8 @@
                 Grid.Column="0"
                 SelectionMode="None"
                 Visibility="Collapsed"
-                ContainerContentChanging="ReviewList_ContainerContentChanging">
+                ContainerContentChanging="ReviewList_ContainerContentChanging"
+                AutomationProperties.Name="Detected books to review">
                 <ListView.ItemTemplate>
                     <DataTemplate>
                         <Grid Padding="8" ColumnSpacing="12">
@@ -94,8 +97,12 @@
                                 CornerRadius="4"
                                 Height="80"
                                 PointerPressed="CropThumbnail_PointerPressed"
-                                ToolTipService.ToolTip="Click to view spine crop">
-                                <Image x:Name="CropImage" Stretch="Uniform" />
+                                ToolTipService.ToolTip="Click to view spine crop"
+                                AutomationProperties.Name="Book spine crop thumbnail">
+                                <Image
+                                    x:Name="CropImage"
+                                    Stretch="Uniform"
+                                    AutomationProperties.Name="Book spine crop thumbnail" />
                             </Border>
 
                             <!-- Editable fields -->
@@ -108,18 +115,21 @@
                                 <TextBox
                                     Header="Title"
                                     Text="{Binding EditedTitle, Mode=TwoWay}"
-                                    PlaceholderText="Book title" />
+                                    PlaceholderText="Book title"
+                                    AutomationProperties.Name="Book title" />
                                 <TextBox
                                     Header="Author"
                                     Text="{Binding EditedAuthor, Mode=TwoWay}"
-                                    PlaceholderText="Author (optional)" />
+                                    PlaceholderText="Author (optional)"
+                                    AutomationProperties.Name="Book author" />
                                 <Button
                                     HorizontalAlignment="Left"
                                     Padding="6,3"
                                     Background="Transparent"
                                     BorderThickness="0"
                                     Click="VoiceTypeButton_Click"
-                                    ToolTipService.ToolTip="Start voice typing (Win+H) — click a text field first">
+                                    ToolTipService.ToolTip="Start voice typing (Win+H) — click a text field first"
+                                    AutomationProperties.Name="Start voice typing">
                                     <StackPanel Orientation="Horizontal" Spacing="4">
                                         <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE720;" FontSize="12" />
                                         <TextBlock Text="Voice" FontSize="11" Opacity="0.7" />
@@ -133,7 +143,8 @@
                                 VerticalAlignment="Center"
                                 IsOn="{Binding IsAccepted, Mode=TwoWay}"
                                 OnContent="Accept"
-                                OffContent="Reject" />
+                                OffContent="Reject"
+                                AutomationProperties.Name="Accept this book" />
                         </Grid>
                     </DataTemplate>
                 </ListView.ItemTemplate>
@@ -157,7 +168,8 @@
                     Click="CloseImagePanel_Click"
                     Padding="8,4"
                     Margin="0,0,0,8"
-                    ToolTipService.ToolTip="Close image" />
+                    ToolTipService.ToolTip="Close image"
+                    AutomationProperties.Name="Close image panel" />
 
                 <Border
                     Grid.Row="1"
@@ -175,7 +187,8 @@
                         VerticalScrollMode="Auto">
                         <Image
                             x:Name="ImagePanelImage"
-                            Stretch="Uniform" />
+                            Stretch="Uniform"
+                            AutomationProperties.Name="Enlarged selected book spine image" />
                     </ScrollViewer>
                 </Border>
             </Grid>
@@ -196,12 +209,14 @@
                     x:Name="LocationDropdown"
                     MinWidth="200"
                     PlaceholderText="Select location..."
-                    DisplayMemberPath="Name" />
+                    DisplayMemberPath="Name"
+                    AutomationProperties.Name="Bookshelf location for saved books" />
                 <Button
                     x:Name="AddLocationButton"
                     Click="AddLocationButton_Click"
                     ToolTipService.ToolTip="Add new location"
-                    Padding="6,4">
+                    Padding="6,4"
+                    AutomationProperties.Name="Add new bookshelf location">
                     <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE710;" FontSize="12" />
                 </Button>
             </StackPanel>
@@ -212,14 +227,15 @@
                 Orientation="Horizontal"
                 Spacing="12">
                 <Button Content="Cancel Import" x:Name="CancelButton" Click="CancelButton_Click"
-                        Visibility="Collapsed" />
-                <Button Content="Accept All" x:Name="AcceptAllButton" Click="AcceptAllButton_Click" />
-                <Button Content="Reject All" x:Name="RejectAllButton" Click="RejectAllButton_Click" />
+                        Visibility="Collapsed" AutomationProperties.Name="Cancel current review import" />
+                <Button Content="Accept All" x:Name="AcceptAllButton" Click="AcceptAllButton_Click" AutomationProperties.Name="Accept all detected books" />
+                <Button Content="Reject All" x:Name="RejectAllButton" Click="RejectAllButton_Click" AutomationProperties.Name="Reject all detected books" />
                 <Button
                     Content="Save to Library"
                     x:Name="SaveButton"
                     Click="SaveButton_Click"
-                    Style="{StaticResource AccentButtonStyle}" />
+                    Style="{StaticResource AccentButtonStyle}"
+                    AutomationProperties.Name="Save accepted books to library" />
             </StackPanel>
         </Grid>
 
@@ -235,7 +251,8 @@
                 x:Name="ReviewStatusText"
                 FontSize="12"
                 Opacity="0.8"
-                Text="Ready" />
+                Text="Ready"
+                AutomationProperties.Name="Review status" />
         </Border>
     </Grid>
 </Page>

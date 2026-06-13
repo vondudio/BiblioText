@@ -58,6 +58,8 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
     private bool _sliderPointerActive;
     private bool _sliderValueChangedSincePress;
     private bool _syncingConfidenceControls;
+    private bool _isExtractingTitles;
+    private bool _isAnalyzingImage;
     private Microsoft.UI.Xaml.DispatcherTimer? _confidenceDebounce;
 
     // Left-button pan state. ScrollViewer only pans with middle-mouse / touch by default;
@@ -259,8 +261,8 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
             }
             _activeImage = item;
             item.IsSelected = true;
-            RemoveButton.IsEnabled = true;
-            AiAnalyzeButton.IsEnabled = true;
+            RemoveButton.IsEnabled = !IsScanActionBusy;
+            AiAnalyzeButton.IsEnabled = !IsScanActionBusy;
         }
 
         // Always swap to the pristine source first so any stale boxes from a previous
@@ -279,7 +281,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
             DefaultImage.Source = cached.Image;
             StatusText.Text = $"(cached) model={_currentModel.Id}  conf={ConfidenceSlider.Value:F2}  detections={cached.BoxPredictions.Count}";
             StatusBar.Visibility = Visibility.Visible;
-            ExtractButton.IsEnabled = cached.BoxPredictions.Count > 0;
+            ExtractButton.IsEnabled = cached.BoxPredictions.Count > 0 && !IsScanActionBusy;
             return;
         }
 
@@ -302,6 +304,23 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         }
         double conf = Math.Round(ConfidenceSlider.Value, 2);
         return $"{_currentModel.Id}|{conf:F2}";
+    }
+
+    private bool IsScanActionBusy => _isExtractingTitles || _isAnalyzingImage;
+
+    private void RefreshActionButtons()
+    {
+        var hasActiveImage = _activeImage != null;
+        RemoveButton.IsEnabled = hasActiveImage && !IsScanActionBusy;
+        AiAnalyzeButton.IsEnabled = hasActiveImage && !IsScanActionBusy;
+
+        if (!hasActiveImage || _currentModel == null || !_activeImage!.Outputs.TryGetValue(CacheKey(), out var cached))
+        {
+            ExtractButton.IsEnabled = false;
+            return;
+        }
+
+        ExtractButton.IsEnabled = cached.BoxPredictions.Count > 0 && !IsScanActionBusy;
     }
 
     // ---------------- Strip event handlers ----------------
@@ -750,6 +769,11 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
 
     private async void ExtractButton_Click(object sender, RoutedEventArgs e)
     {
+        if (IsScanActionBusy)
+        {
+            return;
+        }
+
         if (_activeImage == null || _currentModel == null)
         {
             return;
@@ -766,6 +790,8 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         var boxPredictions = cached.BoxPredictions;
         string displayName = item.DisplayName;
         string? filePath = item.FilePath;
+        _isExtractingTitles = true;
+        RefreshActionButtons();
 
         // Remove from UI without disposing the bitmap (we still need it for cropping)
         int index = _images.IndexOf(item);
@@ -875,6 +901,8 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         finally
         {
             item.Dispose();
+            _isExtractingTitles = false;
+            RefreshActionButtons();
         }
     }
 
@@ -887,6 +915,11 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
 
     private async void AiAnalyzeButton_Click(object sender, RoutedEventArgs e)
     {
+        if (IsScanActionBusy)
+        {
+            return;
+        }
+
         if (_activeImage == null) return;
 
         var workflow = App.WorkflowService;
@@ -896,31 +929,34 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
             return;
         }
 
-        // Capture image data before clearing the screen
-        byte[] imageJpeg;
-        List<BookCrop>? cropsList = null;
-        string filePath = _activeImage.FilePath ?? _activeImage.DisplayName;
-
-        if (_activeImage.Outputs.TryGetValue(CacheKey(), out var cached) && cached.BoxPredictions.Count > 0)
-        {
-            imageJpeg = BitmapFunctions.RenderAnnotatedJpeg(_activeImage.SourceBitmap, cached.BoxPredictions);
-            var opts = new CropExtractorOptions { PaddingPx = 4, MaxLongEdgePx = 512, JpegQuality = 80, FillColor = Color.White };
-            cropsList = await Task.Run(() => CropExtractor.Extract(
-                _activeImage.SourceBitmap, cached.MaskedPredictions, cached.BoxPredictions, opts));
-        }
-        else
-        {
-            using var ms = new MemoryStream();
-            _activeImage.SourceBitmap.Save(ms, System.Drawing.Imaging.ImageFormat.Jpeg);
-            imageJpeg = ms.ToArray();
-        }
-
-        // Clear screen immediately so user can load another scan
-        await RemoveActiveImageAsync();
-        ScanStatusText.Text = "Running AI image analysis...";
+        _isAnalyzingImage = true;
+        RefreshActionButtons();
 
         try
         {
+            // Capture image data before clearing the screen
+            byte[] imageJpeg;
+            List<BookCrop>? cropsList = null;
+            string filePath = _activeImage.FilePath ?? _activeImage.DisplayName;
+
+            if (_activeImage.Outputs.TryGetValue(CacheKey(), out var cached) && cached.BoxPredictions.Count > 0)
+            {
+                imageJpeg = BitmapFunctions.RenderAnnotatedJpeg(_activeImage.SourceBitmap, cached.BoxPredictions);
+                var opts = new CropExtractorOptions { PaddingPx = 4, MaxLongEdgePx = 512, JpegQuality = 80, FillColor = Color.White };
+                cropsList = await Task.Run(() => CropExtractor.Extract(
+                    _activeImage.SourceBitmap, cached.MaskedPredictions, cached.BoxPredictions, opts));
+            }
+            else
+            {
+                using var ms = new MemoryStream();
+                _activeImage.SourceBitmap.Save(ms, System.Drawing.Imaging.ImageFormat.Jpeg);
+                imageJpeg = ms.ToArray();
+            }
+
+            // Clear screen immediately so user can load another scan
+            await RemoveActiveImageAsync();
+            ScanStatusText.Text = "Running AI image analysis...";
+
             var candidates = await workflow.AnalyzeFullImageAsync(imageJpeg, filePath);
 
             if (candidates.Count == 0)
@@ -951,6 +987,11 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         catch (Exception ex)
         {
             ScanStatusText.Text = $"AI analysis failed: {ex.Message}";
+        }
+        finally
+        {
+            _isAnalyzingImage = false;
+            RefreshActionButtons();
         }
     }
 
@@ -1389,7 +1430,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
                     $"{detectionCount} detection{(detectionCount == 1 ? string.Empty : "s")}{segNote}  •  " +
                     $"pre {preprocessMs} ms  •  infer {inferenceMs} ms  •  post {postprocessMs} ms  •  total {swTotal.ElapsedMilliseconds} ms";
                 StatusBar.Visibility = Visibility.Visible;
-                ExtractButton.IsEnabled = detectionCount > 0;
+                ExtractButton.IsEnabled = detectionCount > 0 && !IsScanActionBusy;
             }
             Loader.IsActive = false;
             Loader.Visibility = Visibility.Collapsed;

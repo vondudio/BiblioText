@@ -10,6 +10,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using BiblioText.Models;
 using BiblioText.Services;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace BiblioText.Pages;
 
@@ -19,6 +20,7 @@ public sealed partial class ReviewPage : Page
     private readonly ObservableCollection<Location> _locations = new();
     private readonly List<ScanResultSet> _scanQueue = new();
     private int _currentScanIndex = -1;
+    private bool _isSaving;
 
     public ReviewPage()
     {
@@ -250,6 +252,11 @@ public sealed partial class ReviewPage : Page
 
     private async void SaveButton_Click(object sender, RoutedEventArgs e)
     {
+        if (_isSaving)
+        {
+            return;
+        }
+
         var accepted = _candidates.Where(c => c.IsAccepted).ToList();
         if (accepted.Count == 0)
         {
@@ -283,69 +290,71 @@ public sealed partial class ReviewPage : Page
             ? _scanQueue[_currentScanIndex].SourceImagePath
             : null;
 
-        int saved = 0;
         var savedBooks = new List<Book>();
-        ReviewStatusText.Text = $"Saving {accepted.Count} book(s)...";
-        foreach (var candidate in accepted)
-        {
-            var book = new Book
-            {
-                Title = string.IsNullOrWhiteSpace(candidate.EditedTitle) ? candidate.DetectedTitle : candidate.EditedTitle,
-                Author = string.IsNullOrWhiteSpace(candidate.EditedAuthor) ? candidate.DetectedAuthor : candidate.EditedAuthor,
-                LocationId = locationId,
-                DetectionIndex = candidate.Index > 0 ? candidate.Index : null,
-                BookshelfImagePath = sourceImagePath,
-                CreatedAt = DateTime.UtcNow
-            };
+        _isSaving = true;
+        SaveButton.IsEnabled = false;
+        AcceptAllButton.IsEnabled = false;
+        RejectAllButton.IsEnabled = false;
+        CancelButton.IsEnabled = false;
 
-            // Save spine image if crop is available
-            if (candidate.CropJpeg != null && candidate.CropJpeg.Length > 0)
+        try
+        {
+            ReviewStatusText.Text = $"Preparing {accepted.Count} book(s)...";
+            var reviewService = App.Services?.GetRequiredService<IReviewApplicationService>()
+                ?? new ReviewApplicationService(repo);
+            ReviewStatusText.Text = $"Saving {accepted.Count} book(s)...";
+            var saveResult = await reviewService.SaveAcceptedAsync(accepted, locationId, sourceImagePath);
+            savedBooks.AddRange(saveResult.SavedBooks);
+
+            foreach (var candidate in saveResult.SavedCandidates)
             {
-                var spinesFolder = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "BiblioText", "spines");
-                Directory.CreateDirectory(spinesFolder);
-                var spinePath = Path.Combine(spinesFolder, $"spine_{DateTime.UtcNow:yyyyMMdd_HHmmss}_{saved}.jpg");
-                await File.WriteAllBytesAsync(spinePath, candidate.CropJpeg);
-                book.SpineImagePath = spinePath;
+                _candidates.Remove(candidate);
             }
 
-            await repo.AddBookAsync(book);
-            savedBooks.Add(book);
-            saved++;
-        }
+            await FetchAndStoreDescriptionsAsync(savedBooks, repo);
 
-        // Remove saved candidates from the list
-        foreach (var candidate in accepted)
-        {
-            _candidates.Remove(candidate);
-        }
-
-        // Batch fetch descriptions from AI
-        await FetchAndStoreDescriptionsAsync(savedBooks, repo);
-
-        // Remove this scan set if all candidates are processed
-        if (_candidates.Count == 0 && _currentScanIndex >= 0 && _currentScanIndex < _scanQueue.Count)
-        {
-            _scanQueue.RemoveAt(_currentScanIndex);
-            if (_scanQueue.Count == 0)
+            if (_candidates.Count == 0 && _currentScanIndex >= 0 && _currentScanIndex < _scanQueue.Count)
             {
-                _currentScanIndex = -1;
-                ReviewStatus.Text = "All books saved! Go to the Library tab to view them.";
-                ReviewList.Visibility = Visibility.Collapsed;
-                CancelButton.Visibility = Visibility.Collapsed;
+                _scanQueue.RemoveAt(_currentScanIndex);
+                if (_scanQueue.Count == 0)
+                {
+                    _currentScanIndex = -1;
+                    ReviewStatus.Text = "All books saved! Go to the Library tab to view them.";
+                    ReviewList.Visibility = Visibility.Collapsed;
+                    CancelButton.Visibility = Visibility.Collapsed;
+                }
+                else
+                {
+                    if (_currentScanIndex >= _scanQueue.Count)
+                        _currentScanIndex = _scanQueue.Count - 1;
+                    DisplayCurrentScanSet();
+                }
+                UpdateScanNavigation();
             }
             else
             {
-                if (_currentScanIndex >= _scanQueue.Count)
-                    _currentScanIndex = _scanQueue.Count - 1;
-                DisplayCurrentScanSet();
+                ReviewStatus.Text = $"Saved {savedBooks.Count} book(s) to library. {_candidates.Count} remaining.";
             }
-            UpdateScanNavigation();
         }
-        else
+        catch (Exception ex)
         {
-            ReviewStatus.Text = $"Saved {saved} book(s) to library. {_candidates.Count} remaining.";
+            ReviewStatusText.Text = $"Save failed: {ex.Message}";
+            var dialog = new ContentDialog
+            {
+                Title = "Save failed",
+                Content = $"No books were removed from the review list. {ex.Message}",
+                CloseButtonText = "OK",
+                XamlRoot = this.XamlRoot
+            };
+            await dialog.ShowAsync();
+        }
+        finally
+        {
+            _isSaving = false;
+            SaveButton.IsEnabled = true;
+            AcceptAllButton.IsEnabled = true;
+            RejectAllButton.IsEnabled = true;
+            CancelButton.IsEnabled = _currentScanIndex >= 0 && _currentScanIndex < _scanQueue.Count;
         }
     }
 
@@ -367,7 +376,14 @@ public sealed partial class ReviewPage : Page
 
             var descService = new BookDescriptionService(settingsStore);
             var bookList = books.Select(b => (b.Id, b.Title, b.Author)).ToList();
-            var descriptions = await descService.GetDescriptionsAsync(bookList);
+            var descriptionResult = await descService.GetDescriptionsResultAsync(bookList);
+            if (!descriptionResult.IsSuccess)
+            {
+                ReviewStatusText.Text = $"Descriptions skipped: {descriptionResult.ErrorMessage}";
+                return;
+            }
+
+            var descriptions = descriptionResult.Descriptions;
 
             if (descriptions.Count == 0)
             {

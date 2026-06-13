@@ -12,6 +12,7 @@ public interface ILibraryRepository
 
     // Books
     Task<int> AddBookAsync(Book book);
+    Task<List<int>> AddBooksAsync(IReadOnlyList<Book> books);
     Task UpdateBookAsync(Book book);
     Task DeleteBookAsync(int bookId);
     Task<List<Book>> GetBooksAsync(string? searchQuery = null, int? locationId = null);

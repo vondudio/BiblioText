@@ -14,9 +14,9 @@ namespace BiblioText.Services;
 /// Real Azure OpenAI implementation of <see cref="IBookTitleExtractor"/>.
 /// Sends a single crop as a base64 data URL to GPT vision and extracts the title.
 /// </summary>
-internal sealed class AzureOpenAiTitleExtractor : IBookTitleExtractor
-{
-    private readonly HttpClient _httpClient = new();
+    internal sealed class AzureOpenAiTitleExtractor : IBookTitleExtractor
+    {
+    private readonly HttpClient _httpClient = AzureOpenAiHttp.CreateClient();
     private readonly ISettingsStore _settingsStore;
 
     public AzureOpenAiTitleExtractor(ISettingsStore settingsStore)
@@ -52,27 +52,30 @@ internal sealed class AzureOpenAiTitleExtractor : IBookTitleExtractor
 
         var url = $"{settings.AzureOpenAiEndpoint!.TrimEnd('/')}/openai/deployments/{settings.AzureOpenAiDeployment}/chat/completions?api-version={settings.ApiVersion}";
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, url);
-        request.Headers.Add("api-key", settings.AzureOpenAiApiKey);
-        request.Content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
+        var serializedBody = JsonSerializer.Serialize(requestBody);
+        var result = await AzureOpenAiHttp.SendAsync(
+            _httpClient,
+            () =>
+            {
+                var request = new HttpRequestMessage(HttpMethod.Post, url);
+                request.Headers.Add("api-key", settings.AzureOpenAiApiKey);
+                request.Content = new StringContent(serializedBody, Encoding.UTF8, "application/json");
+                return request;
+            },
+            ct);
 
-        using var response = await _httpClient.SendAsync(request, ct);
-        var json = await response.Content.ReadAsStringAsync(ct);
-
-        if (!response.IsSuccessStatusCode)
-            return $"(AI error: {response.StatusCode})";
+        if (!result.IsSuccess || result.Value == null)
+        {
+            return $"(AI error: {result.ErrorMessage ?? "request failed"})";
+        }
 
         try
         {
-            using var doc = JsonDocument.Parse(json);
-            var content = doc.RootElement
-                .GetProperty("choices")[0]
-                .GetProperty("message")
-                .GetProperty("content")
-                .GetString();
-            return content?.Trim() ?? "unknown";
+            return AzureOpenAiHttp.TryGetMessageContent(result.Value, out var content, out _)
+                ? content
+                : "unknown";
         }
-        catch
+        catch (JsonException)
         {
             return "unknown";
         }

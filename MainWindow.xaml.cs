@@ -130,4 +130,10 @@ StackTrace: {ex.StackTrace}
             reviewPage.SetCandidates(candidates, sourceImagePath);
         }
     }
+
+    internal void NavigateToScan()
+    {
+        NavView.SelectedItem = NavView.MenuItems[0];
+        RootFrame.Navigate(typeof(Sample));
+    }
 }

@@ -28,6 +28,7 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="200" />
                     <ColumnDefinition Width="160" />
+                    <ColumnDefinition Width="170" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
@@ -36,19 +37,22 @@
                     Grid.Column="0"
                     PlaceholderText="Search books..."
                     QueryIcon="Find"
-                    TextChanged="SearchBox_TextChanged" />
+                    TextChanged="SearchBox_TextChanged"
+                    AutomationProperties.Name="Search library" />
 
                 <ComboBox
                     x:Name="LocationFilter"
                     Grid.Column="1"
                     PlaceholderText="All Locations"
-                    SelectionChanged="LocationFilter_SelectionChanged" />
+                    SelectionChanged="LocationFilter_SelectionChanged"
+                    AutomationProperties.Name="Filter by bookshelf location" />
 
                 <ComboBox
                     x:Name="SortDropdown"
                     Grid.Column="2"
                     PlaceholderText="Sort by..."
-                    SelectionChanged="SortDropdown_SelectionChanged">
+                    SelectionChanged="SortDropdown_SelectionChanged"
+                    AutomationProperties.Name="Sort library">
                     <x:String>Title A→Z</x:String>
                     <x:String>Title Z→A</x:String>
                     <x:String>Author A→Z</x:String>
@@ -57,12 +61,37 @@
                     <x:String>Oldest First</x:String>
                 </ComboBox>
 
-                <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8">
-                    <Button x:Name="AddLocationBtn" Click="AddLocationBtn_Click" ToolTipService.ToolTip="Manage locations">
+                <ComboBox
+                    x:Name="StatusFilter"
+                    Grid.Column="3"
+                    PlaceholderText="Status"
+                    SelectionChanged="StatusFilter_SelectionChanged"
+                    AutomationProperties.Name="Filter by book status">
+                    <x:String>All Books</x:String>
+                    <x:String>Duplicates</x:String>
+                    <x:String>Missing Descriptions</x:String>
+                </ComboBox>
+
+                <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="8">
+                    <Button
+                        x:Name="AddLocationBtn"
+                        Click="AddLocationBtn_Click"
+                        ToolTipService.ToolTip="Manage locations"
+                        AutomationProperties.Name="Add bookshelf location">
                         <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE728;" FontSize="14" />
                     </Button>
-                    <Button x:Name="ChangeLocationBtn" Click="ChangeLocationBtn_Click" Content="Change Location" IsEnabled="False" />
-                    <Button x:Name="DeleteBookBtn" Click="DeleteBookBtn_Click" ToolTipService.ToolTip="Delete selected books" IsEnabled="False">
+                    <Button
+                        x:Name="ChangeLocationBtn"
+                        Click="ChangeLocationBtn_Click"
+                        Content="Change Location"
+                        IsEnabled="False"
+                        AutomationProperties.Name="Change location for selected books" />
+                    <Button
+                        x:Name="DeleteBookBtn"
+                        Click="DeleteBookBtn_Click"
+                        ToolTipService.ToolTip="Delete selected books"
+                        IsEnabled="False"
+                        AutomationProperties.Name="Delete selected books">
                         <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE74D;" FontSize="14" />
                     </Button>
                 </StackPanel>
@@ -97,7 +126,8 @@
                                 BorderThickness="0"
                                 Click="SpineImage_Click"
                                 IsEnabled="{Binding HasBookshelfImage}"
-                                ToolTipService.ToolTip="View bookshelf scan">
+                                ToolTipService.ToolTip="View bookshelf scan"
+                                AutomationProperties.Name="{Binding Title}">
                                 <Border
                                     Width="64"
                                     Height="84"
@@ -111,7 +141,10 @@
                                             Glyph="&#xE736;"
                                             FontSize="20"
                                             Opacity="0.3" />
-                                        <Image Source="{Binding SpineImage}" Stretch="UniformToFill" />
+                                        <Image
+                                            Source="{Binding SpineImage}"
+                                            Stretch="UniformToFill"
+                                            AutomationProperties.Name="{Binding Title}" />
                                         <Border
                                             HorizontalAlignment="Left"
                                             VerticalAlignment="Top"
@@ -129,6 +162,13 @@
                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                     <TextBlock Text="{Binding Author}" Opacity="0.7" FontSize="13" TextTrimming="CharacterEllipsis" MaxLines="1" />
                                     <TextBlock Text="{Binding LocationDisplay}" Opacity="0.5" FontSize="12" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxLines="1" />
+                                    <Border
+                                        Background="{ThemeResource SystemFillColorCautionBackgroundBrush}"
+                                        CornerRadius="4"
+                                        Padding="4,1"
+                                        Visibility="{Binding DuplicateVisibility}">
+                                        <TextBlock Text="Duplicate" FontSize="11" />
+                                    </Border>
                                 </StackPanel>
                             </StackPanel>
 
@@ -150,7 +190,8 @@
                                 Background="Transparent"
                                 BorderThickness="0"
                                 Click="DescriptionButton_Click"
-                                ToolTipService.ToolTip="View full description">
+                                ToolTipService.ToolTip="View full description"
+                                AutomationProperties.Name="View full book description">
                                 <TextBlock Text="ℹ" FontSize="14" />
                             </Button>
 
@@ -162,7 +203,8 @@
                                 VerticalAlignment="Center"
                                 Background="Transparent"
                                 BorderThickness="0"
-                                Tag="{Binding}">
+                                Tag="{Binding}"
+                                AutomationProperties.Name="More book actions">
                                 <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE712;" FontSize="14" />
                                 <Button.Flyout>
                                     <MenuFlyout>
@@ -194,6 +236,11 @@
                 <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE736;" FontSize="48" Opacity="0.3" />
                 <TextBlock Text="No books in your library yet" Opacity="0.5" HorizontalAlignment="Center" />
                 <TextBlock Text="Scan a bookshelf and save detected books to get started." Opacity="0.4" FontSize="12" HorizontalAlignment="Center" />
+                <Button
+                    Content="Start Scanning"
+                    HorizontalAlignment="Center"
+                    Click="StartScanningButton_Click"
+                    AutomationProperties.Name="Start scanning a bookshelf" />
             </StackPanel>
         </Grid>
 
@@ -224,7 +271,8 @@
                         HorizontalAlignment="Right"
                         Click="CloseBookshelfOverlay_Click"
                         Padding="8,4"
-                        ToolTipService.ToolTip="Close image" />
+                        ToolTipService.ToolTip="Close image"
+                        AutomationProperties.Name="Close bookshelf image overlay" />
 
                     <ScrollViewer
                         x:Name="BookshelfOverlayScroller"
@@ -235,7 +283,8 @@
                         <Grid>
                             <Image
                                 x:Name="BookshelfOverlayImage"
-                                Stretch="Uniform" />
+                                Stretch="Uniform"
+                                AutomationProperties.Name="Bookshelf scan image" />
                             <Border
                                 x:Name="SpineOverlayBorder"
                                 HorizontalAlignment="Right"
@@ -251,7 +300,8 @@
                                     x:Name="SpineOverlayImage"
                                     MaxWidth="160"
                                     MaxHeight="300"
-                                    Stretch="Uniform" />
+                                    Stretch="Uniform"
+                                    AutomationProperties.Name="Selected book spine image" />
                             </Border>
                         </Grid>
                     </ScrollViewer>

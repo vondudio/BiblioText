@@ -16,7 +16,7 @@ namespace BiblioText.Services;
 /// </summary>
 internal sealed class BookDescriptionService
 {
-    private readonly HttpClient _httpClient = new();
+    private readonly HttpClient _httpClient = AzureOpenAiHttp.CreateClient();
     private readonly ISettingsStore _settingsStore;
 
     public BookDescriptionService(ISettingsStore settingsStore)
@@ -28,9 +28,17 @@ internal sealed class BookDescriptionService
         IReadOnlyList<(int BookId, string Title, string? Author)> books,
         CancellationToken ct = default)
     {
+        var result = await GetDescriptionsResultAsync(books, ct);
+        return result.IsSuccess ? result.Descriptions : new List<BookDescription>();
+    }
+
+    public async Task<BookDescriptionBatchResult> GetDescriptionsResultAsync(
+        IReadOnlyList<(int BookId, string Title, string? Author)> books,
+        CancellationToken ct = default)
+    {
         var settings = _settingsStore.Load();
         if (!settings.IsConfigured)
-            return new List<BookDescription>();
+            return BookDescriptionBatchResult.Failure(AzureOpenAiErrorKind.NotConfigured, "Azure OpenAI not configured.");
 
         // Build the book list for the prompt
         var sb = new StringBuilder();
@@ -86,27 +94,34 @@ internal sealed class BookDescriptionService
 
         var url = $"{settings.AzureOpenAiEndpoint!.TrimEnd('/')}/openai/deployments/{settings.AzureOpenAiDeployment}/chat/completions?api-version={settings.ApiVersion}";
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, url);
-        request.Headers.Add("api-key", settings.AzureOpenAiApiKey);
-        request.Content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
+        var serializedBody = JsonSerializer.Serialize(requestBody);
+        var result = await AzureOpenAiHttp.SendAsync(
+            _httpClient,
+            () =>
+            {
+                var request = new HttpRequestMessage(HttpMethod.Post, url);
+                request.Headers.Add("api-key", settings.AzureOpenAiApiKey);
+                request.Content = new StringContent(serializedBody, Encoding.UTF8, "application/json");
+                return request;
+            },
+            ct);
 
-        using var response = await _httpClient.SendAsync(request, ct);
-        var json = await response.Content.ReadAsStringAsync(ct);
-
-        if (!response.IsSuccessStatusCode)
-            return new List<BookDescription>();
+        if (!result.IsSuccess || result.Value == null)
+        {
+            return BookDescriptionBatchResult.Failure(
+                result.ErrorKind,
+                result.ErrorMessage ?? "Azure OpenAI request failed.",
+                result.DiagnosticDetail);
+        }
 
         try
         {
-            using var doc = JsonDocument.Parse(json);
-            var content = doc.RootElement
-                .GetProperty("choices")[0]
-                .GetProperty("message")
-                .GetProperty("content")
-                .GetString();
-
-            if (string.IsNullOrWhiteSpace(content))
-                return new List<BookDescription>();
+            if (!AzureOpenAiHttp.TryGetMessageContent(result.Value, out var content, out var contentError))
+            {
+                return BookDescriptionBatchResult.Failure(
+                    AzureOpenAiErrorKind.EmptyResponse,
+                    contentError);
+            }
 
             var parsed = JsonSerializer.Deserialize<DescriptionResponse>(content, new JsonSerializerOptions
             {
@@ -114,7 +129,9 @@ internal sealed class BookDescriptionService
             });
 
             if (parsed?.Descriptions == null)
-                return new List<BookDescription>();
+                return BookDescriptionBatchResult.Failure(
+                    AzureOpenAiErrorKind.Parse,
+                    "Description response did not contain a descriptions array.");
 
             // Map indices back to book IDs
             var results = new List<BookDescription>();
@@ -131,13 +148,46 @@ internal sealed class BookDescriptionService
                     });
                 }
             }
-            return results;
+            return BookDescriptionBatchResult.Success(results);
         }
-        catch
+        catch (Exception ex)
         {
-            return new List<BookDescription>();
+            return BookDescriptionBatchResult.Failure(
+                AzureOpenAiErrorKind.Parse,
+                "Failed to parse description response.",
+                ex.Message);
         }
     }
+}
+
+public sealed class BookDescriptionBatchResult
+{
+    private BookDescriptionBatchResult(
+        List<BookDescription> descriptions,
+        AzureOpenAiErrorKind errorKind,
+        string? errorMessage,
+        string? diagnosticDetail)
+    {
+        Descriptions = descriptions;
+        ErrorKind = errorKind;
+        ErrorMessage = errorMessage;
+        DiagnosticDetail = diagnosticDetail;
+    }
+
+    public List<BookDescription> Descriptions { get; }
+    internal AzureOpenAiErrorKind ErrorKind { get; }
+    public string? ErrorMessage { get; }
+    public string? DiagnosticDetail { get; }
+    public bool IsSuccess => ErrorKind == AzureOpenAiErrorKind.None;
+
+    public static BookDescriptionBatchResult Success(List<BookDescription> descriptions) =>
+        new(descriptions, AzureOpenAiErrorKind.None, null, null);
+
+    internal static BookDescriptionBatchResult Failure(
+        AzureOpenAiErrorKind errorKind,
+        string errorMessage,
+        string? diagnosticDetail = null) =>
+        new(new List<BookDescription>(), errorKind, errorMessage, diagnosticDetail);
 }
 
 public sealed class BookDescription
