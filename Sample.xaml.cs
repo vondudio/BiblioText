@@ -162,13 +162,27 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
             new Microsoft.UI.Xaml.Input.PointerEventHandler(ImageScroller_PointerCaptureLost),
             handledEventsToo: true);
 
-        // BoxOverlay receives draw-mode pointer events directly. When draw mode
-        // is off the Canvas just hosts hit-testable Rectangle children for
-        // tap-to-deselect; these handlers no-op in that case.
-        BoxOverlay.PointerPressed += BoxOverlay_PointerPressed;
-        BoxOverlay.PointerMoved += BoxOverlay_PointerMoved;
-        BoxOverlay.PointerReleased += BoxOverlay_PointerReleased;
-        BoxOverlay.PointerCaptureLost += BoxOverlay_PointerCaptureLost;
+        // BoxOverlay receives draw-mode pointer events directly. ScrollViewer
+        // marks pointer events handled internally for its own scroll/zoom logic,
+        // so we have to use AddHandler with handledEventsToo:true (the same
+        // pattern the pan handlers below use) — otherwise the overlay's regular
+        // PointerPressed never fires and Draw mode silently does nothing.
+        BoxOverlay.AddHandler(
+            PointerPressedEvent,
+            new Microsoft.UI.Xaml.Input.PointerEventHandler(BoxOverlay_PointerPressed),
+            handledEventsToo: true);
+        BoxOverlay.AddHandler(
+            PointerMovedEvent,
+            new Microsoft.UI.Xaml.Input.PointerEventHandler(BoxOverlay_PointerMoved),
+            handledEventsToo: true);
+        BoxOverlay.AddHandler(
+            PointerReleasedEvent,
+            new Microsoft.UI.Xaml.Input.PointerEventHandler(BoxOverlay_PointerReleased),
+            handledEventsToo: true);
+        BoxOverlay.AddHandler(
+            PointerCaptureLostEvent,
+            new Microsoft.UI.Xaml.Input.PointerEventHandler(BoxOverlay_PointerCaptureLost),
+            handledEventsToo: true);
     }
 
     private void Page_Loaded()
@@ -1939,7 +1953,12 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         ApplyExclusionVisual(rect, p.IsExcluded);
         Canvas.SetLeft(rect, box.Xmin);
         Canvas.SetTop(rect, box.Ymin);
-        rect.PointerPressed += Box_PointerPressed;
+        // Use AddHandler(handledEventsToo:true) so ScrollViewer's internal
+        // pointer-event handling doesn't swallow the tap before it reaches us.
+        rect.AddHandler(
+            PointerPressedEvent,
+            new Microsoft.UI.Xaml.Input.PointerEventHandler(Box_PointerPressed),
+            handledEventsToo: true);
         return rect;
     }
 
