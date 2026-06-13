@@ -108,8 +108,8 @@
                         <Grid Padding="8,12" ColumnSpacing="12">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="72" />
-                                <ColumnDefinition Width="2*" />
-                                <ColumnDefinition Width="3*" />
+                                <ColumnDefinition Width="Auto" MinWidth="200" MaxWidth="280" />
+                                <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="100" />
                                 <ColumnDefinition Width="Auto" />
@@ -163,19 +163,22 @@
                                 </Border>
                             </Button>
 
-                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2" MaxWidth="280">
                                 <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="WrapWholeWords" MaxLines="2" />
                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                     <TextBlock Text="{Binding Author}" Opacity="0.7" FontSize="13" TextTrimming="CharacterEllipsis" MaxLines="1" />
                                     <TextBlock Text="{Binding LocationDisplay}" Opacity="0.5" FontSize="12" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxLines="1" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,2,0,0">
                                     <Border
                                         Background="{ThemeResource SystemFillColorCautionBackgroundBrush}"
                                         CornerRadius="4"
                                         Padding="4,1"
+                                        VerticalAlignment="Center"
                                         Visibility="{Binding DuplicateVisibility}">
                                         <TextBlock Text="Duplicate" FontSize="11" />
                                     </Border>
-                                    <ItemsControl ItemsSource="{Binding ProviderBadges}">
+                                    <ItemsControl ItemsSource="{Binding ProviderBadges}" VerticalAlignment="Center">
                                         <ItemsControl.ItemsPanel>
                                             <ItemsPanelTemplate>
                                                 <StackPanel Orientation="Horizontal" Spacing="3" />

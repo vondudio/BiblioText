@@ -11,7 +11,7 @@ internal static class DefaultPrompts
     // CompositeSettingsStore discards user-saved prompt overrides whose
     // PromptsVersion is below this number, so stale text doesn't linger
     // in Settings UI.
-    public const int CurrentVersion = 2;
+    public const int CurrentVersion = 3;
 
     public const string SpineExtraction = """
         You are reading a single book spine in an image. Return a JSON object with exactly these fields:
@@ -94,7 +94,10 @@ internal static class DefaultPrompts
           covering: setting and historical context, principal characters or subjects, the central
           narrative arc or argument, recurring themes and motifs, formal or stylistic features,
           and the work's reception and literary significance. Use coherent paragraph flow, not a
-          bulleted outline.
+          bulleted outline. Insert a blank line (two newline characters) between thematic
+          paragraphs — typically: (1) setting + premise + principal characters,
+          (2) central arc or argument, (3) themes + style + reception. Do not label the
+          paragraphs. The blank lines are mandatory.
 
         Sourcing rules:
         - When sources are supplied for a book, synthesize a single description from the union of

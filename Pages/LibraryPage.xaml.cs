@@ -302,21 +302,118 @@ public sealed partial class LibraryPage : Page
             return;
         }
 
+        var stack = new StackPanel { Spacing = 10, MaxWidth = 520 };
+
+        // Title header
+        stack.Children.Add(new TextBlock
+        {
+            Text = string.IsNullOrWhiteSpace(book.Author) ? book.Title : $"{book.Title} — {book.Author}",
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            FontSize = 14,
+            TextWrapping = TextWrapping.WrapWholeWords
+        });
+
+        // Long description as paragraphs (split on blank lines; if none, group by sentences)
+        var rich = new RichTextBlock
+        {
+            TextWrapping = TextWrapping.WrapWholeWords,
+            FontSize = 13,
+            LineHeight = 19
+        };
+
+        var body = string.IsNullOrWhiteSpace(book.LongDescription)
+            ? "No description available"
+            : book.LongDescription;
+
+        foreach (var paragraphText in SplitIntoParagraphs(body))
+        {
+            var p = new Microsoft.UI.Xaml.Documents.Paragraph
+            {
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+            p.Inlines.Add(new Microsoft.UI.Xaml.Documents.Run { Text = paragraphText });
+            rich.Blocks.Add(p);
+        }
+
+        stack.Children.Add(rich);
+
+        // Sources footer (if any)
+        var sourceDisplay = book.DescriptionSourceDisplayForDialog;
+        if (!string.IsNullOrWhiteSpace(sourceDisplay))
+        {
+            stack.Children.Add(new TextBlock
+            {
+                Text = "Sources",
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                FontSize = 11,
+                Opacity = 0.7,
+                Margin = new Thickness(0, 4, 0, 0)
+            });
+            stack.Children.Add(new TextBlock
+            {
+                Text = sourceDisplay,
+                FontSize = 11,
+                Opacity = 0.6,
+                TextWrapping = TextWrapping.WrapWholeWords
+            });
+        }
+
         var flyout = new Flyout
         {
             Content = new ScrollViewer
             {
-                MaxWidth = 420,
-                MaxHeight = 320,
-                Content = new TextBlock
-                {
-                    Text = book.LongDescriptionDisplay,
-                    TextWrapping = TextWrapping.WrapWholeWords
-                }
+                MaxWidth = 540,
+                MaxHeight = 480,
+                HorizontalScrollMode = ScrollMode.Disabled,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                Padding = new Thickness(4),
+                Content = stack
             }
         };
 
         flyout.ShowAt(target);
+    }
+
+    private static IEnumerable<string> SplitIntoParagraphs(string body)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            yield break;
+        }
+
+        // Prefer explicit blank-line breaks if the AI emitted them.
+        var blocks = body
+            .Replace("\r\n", "\n")
+            .Split(new[] { "\n\n" }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(s => s.Replace("\n", " ").Trim())
+            .Where(s => s.Length > 0)
+            .ToList();
+
+        if (blocks.Count > 1)
+        {
+            foreach (var b in blocks) yield return b;
+            yield break;
+        }
+
+        // Otherwise group every 3 sentences into a paragraph.
+        var flat = body.Replace("\r", " ").Replace("\n", " ").Trim();
+        var sentences = System.Text.RegularExpressions.Regex
+            .Split(flat, @"(?<=[\.\?\!])\s+(?=[A-Z""'\u201c])")
+            .Where(s => !string.IsNullOrWhiteSpace(s))
+            .Select(s => s.Trim())
+            .ToList();
+
+        if (sentences.Count == 0)
+        {
+            yield return flat;
+            yield break;
+        }
+
+        const int sentencesPerParagraph = 3;
+        for (int i = 0; i < sentences.Count; i += sentencesPerParagraph)
+        {
+            yield return string.Join(" ", sentences.Skip(i).Take(sentencesPerParagraph));
+        }
     }
 
     private void CloseBookshelfOverlay_Click(object sender, RoutedEventArgs e)
@@ -538,6 +635,8 @@ internal sealed class BookDisplay
     public Visibility GroundedVisibility => IsDescriptionGrounded ? Visibility.Visible : Visibility.Collapsed;
     public string CreatedAtDisplay { get; }
     public string DetectionLabel => DetectionIndex.HasValue ? $"#{DetectionIndex}" : "";
+
+    public string DescriptionSourceDisplayForDialog => DescriptionSourceDisplay;
 
     private string DescriptionSourceDisplay
     {
