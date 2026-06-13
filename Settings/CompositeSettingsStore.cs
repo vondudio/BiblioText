@@ -23,11 +23,32 @@ public sealed class CompositeSettingsStore : ISettingsStore
     public AppSettings Load()
     {
         AppSettings settings = _primaryStore.Load();
-        return settings.IsConfigured ? settings : _fallbackStore.Load();
+        AppSettings effective = settings.IsConfigured ? settings : _fallbackStore.Load();
+        MigratePrompts(effective);
+        return effective;
     }
 
     public void Save(AppSettings settings)
     {
+        settings.PromptsVersion = Services.DefaultPrompts.CurrentVersion;
         _primaryStore.Save(settings);
+    }
+
+    private static void MigratePrompts(AppSettings settings)
+    {
+        if (settings.PromptsVersion >= Services.DefaultPrompts.CurrentVersion)
+        {
+            return;
+        }
+
+        // Stale defaults from older builds: discard saved overrides so the
+        // current DefaultPrompts.* values take effect in both the Settings
+        // editor and at runtime. User keeps a Reset button if they want to
+        // re-apply.
+        settings.SpineExtractionPrompt = null;
+        settings.BookshelfAnalysisSystemPrompt = null;
+        settings.BookshelfAnalysisUserPrompt = null;
+        settings.BookDescriptionPrompt = null;
+        settings.PromptsVersion = Services.DefaultPrompts.CurrentVersion;
     }
 }

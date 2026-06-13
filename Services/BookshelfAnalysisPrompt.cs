@@ -7,6 +7,12 @@ namespace BiblioText.Services;
 /// </summary>
 internal static class DefaultPrompts
 {
+    // Bump this any time a default prompt is materially changed. On load,
+    // CompositeSettingsStore discards user-saved prompt overrides whose
+    // PromptsVersion is below this number, so stale text doesn't linger
+    // in Settings UI.
+    public const int CurrentVersion = 2;
+
     public const string SpineExtraction = """
         You are reading a single book spine in an image. Return a JSON object with exactly these fields:
         {"title": "Book Title", "author": "Author Name", "confidence": 0.95}
@@ -84,7 +90,7 @@ internal static class DefaultPrompts
         Lengths (firm targets — do not under- or over-shoot):
         - "short_description": exactly 3-4 complete sentences. A self-contained capsule covering
           genre/form, the central premise or subject, and the work's most distinctive quality.
-        - "long_description": exactly 12-15 complete sentences. A substantive academic summary
+        - "long_description": exactly 8-10 complete sentences. A substantive academic summary
           covering: setting and historical context, principal characters or subjects, the central
           narrative arc or argument, recurring themes and motifs, formal or stylistic features,
           and the work's reception and literary significance. Use coherent paragraph flow, not a

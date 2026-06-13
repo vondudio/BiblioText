@@ -18,6 +18,10 @@ public sealed class AppSettings
     public string? BookshelfAnalysisUserPrompt { get; set; }
     public string? BookDescriptionPrompt { get; set; }
 
+    // Bump in DefaultPrompts.CurrentVersion whenever a default prompt changes
+    // so stale user-saved overrides are auto-discarded on next load.
+    public int PromptsVersion { get; set; }
+
     public bool IsConfigured => !string.IsNullOrWhiteSpace(AzureOpenAiEndpoint)
                              && !string.IsNullOrWhiteSpace(AzureOpenAiApiKey)
                              && !string.IsNullOrWhiteSpace(AzureOpenAiDeployment);
