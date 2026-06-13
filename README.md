@@ -146,21 +146,22 @@ The app uses a **NavigationView** shell with four pages:
 └─────────────────────────────────────────────────────┘
 
 Models/           Domain models (Book, ReviewCandidate, ImageItem, Scan, Location)
-Services/         AI integration (AzureOpenAiAnalysisClient, CropExtractor, ScanWorkflowService)
+Services/         AI integration, crop extraction, scan workflow, review save orchestration
 Persistence/      SQLite repository (ILibraryRepository, SqliteLibraryRepository)
 Settings/         Encrypted settings storage (DPAPI + environment variable fallback)
 Utils/            Image processing (BitmapFunctions, YOLOHelpers, Letterbox)
-ViewModels/       MVVM view models (CommunityToolkit.Mvvm)
 scripts/          Model download automation
 ```
 
 ### Key Design Decisions
+- **Dependency injection composition root** — `App.xaml.cs` registers settings, repository, AI clients, scan workflow, review application service, and semantic search with `Microsoft.Extensions.DependencyInjection`. Static `App` accessors remain as compatibility shims while pages are migrated incrementally.
 - **NavigationCacheMode.Required** on all pages — pane state is preserved when navigating between tabs.
 - **Per-image inference cache** — switching back to a previously-processed image is instant.
 - **Camera via MediaCapture API** — uses `CapturePhotoToStreamAsync` for still photos (not frame grab). On ARM64, discovers `MediaFrameSourceGroup` matching the device for reliable preview.
 - **Single ContentDialog rule** — WinUI 3 only allows one ContentDialog open at a time; camera dialog uses `Opened` event for deferred init.
 - **Azure OpenAI GPT-5.4** — uses `max_completion_tokens` (not `max_tokens`), `api-key` header, API version `2024-10-21`.
-- **SQLite persistence** — auto-migrates schema with `ALTER TABLE ADD COLUMN` for new fields.
+- **SQLite persistence** — auto-migrates schema with `ALTER TABLE ADD COLUMN` for new fields, serializes access to the shared connection, and uses batch transactions for review saves.
+- **AI resilience** — Azure OpenAI calls use bounded timeouts, transient retry/backoff, and response-shape validation before parsing model content.
 
 ---
 
@@ -220,10 +221,12 @@ Pages/
   SettingsPage.xaml(.cs)   # Azure OpenAI + camera configuration
 
 Services/
+  AzureOpenAiHttp.cs              # Shared timeout, retry, and response validation helper
   AzureOpenAiAnalysisClient.cs   # GPT-5.4 vision API for full-image analysis
   AzureOpenAiTitleExtractor.cs   # Per-crop title extraction
   CropExtractor.cs               # Crop bounding boxes from detection results
   ScanWorkflowService.cs         # Orchestrates crop → AI → ReviewCandidate pipeline
+  ReviewApplicationService.cs    # Stages crops, detects duplicates, and transactionally saves accepted books
   BookshelfAnalysisPrompt.cs     # System prompt for bookshelf AI analysis
 
 Persistence/
@@ -240,8 +243,6 @@ Utils/
   Letterbox.cs             # Scale/pad math
   YOLOHelpers.cs           # Prediction extraction (v4, YOLO26 E2E, one-to-many, NMS)
   WinMLHelpers.cs          # ExecutionProvider plumbing
-
-ViewModels/                # MVVM view models (CommunityToolkit.Mvvm)
 
 Sample.xaml(.cs)           # Main Scan page: detection, camera, AI analyze, extract
 MainWindow.xaml(.cs)       # NavigationView shell

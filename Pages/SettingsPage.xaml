@@ -22,34 +22,40 @@
                 <TextBox
                     x:Name="EndpointBox"
                     Header="Endpoint"
-                    PlaceholderText="https://your-resource.openai.azure.com" />
+                    PlaceholderText="https://your-resource.openai.azure.com"
+                    AutomationProperties.Name="Azure OpenAI endpoint" />
 
                 <PasswordBox
                     x:Name="ApiKeyBox"
                     Header="API Key"
-                    PlaceholderText="Enter your API key" />
+                    PlaceholderText="Enter your API key"
+                    AutomationProperties.Name="Azure OpenAI API key" />
 
                 <TextBox
                     x:Name="DeploymentBox"
                     Header="Deployment Name"
-                    PlaceholderText="gpt-4o or your deployment name" />
+                    PlaceholderText="gpt-4o or your deployment name"
+                    AutomationProperties.Name="Azure OpenAI deployment name" />
 
                 <TextBox
                     x:Name="ApiVersionBox"
                     Header="API Version"
                     PlaceholderText="2024-10-21"
-                    Text="2024-10-21" />
+                    Text="2024-10-21"
+                    AutomationProperties.Name="Azure OpenAI API version" />
 
                 <StackPanel Orientation="Horizontal" Spacing="12">
                     <Button
                         x:Name="SaveButton"
                         Content="Save"
                         Click="SaveButton_Click"
-                        Style="{StaticResource AccentButtonStyle}" />
+                        Style="{StaticResource AccentButtonStyle}"
+                        AutomationProperties.Name="Save settings" />
                     <Button
                         x:Name="TestButton"
                         Content="Test Connection"
-                        Click="TestButton_Click" />
+                        Click="TestButton_Click"
+                        AutomationProperties.Name="Test Azure OpenAI connection" />
                 </StackPanel>
 
                 <InfoBar
@@ -73,7 +79,8 @@
                     Header="Use camera capture"
                     OffContent="Disabled"
                     OnContent="Enabled"
-                    Toggled="UseCameraToggle_Toggled" />
+                    Toggled="UseCameraToggle_Toggled"
+                    AutomationProperties.Name="Use camera capture" />
             </StackPanel>
         </StackPanel>
     </ScrollViewer>

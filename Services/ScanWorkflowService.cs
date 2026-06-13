@@ -93,9 +93,13 @@ internal sealed class ScanWorkflowService
     {
         var result = await _analysisClient.AnalyzeAsync(imageJpeg, ct);
 
-        if (!result.IsSuccess || result.Books == null || result.Books.Count == 0)
+        if (result.Error != null)
         {
-            // Return empty or throw based on error
+            throw new InvalidOperationException(result.Error);
+        }
+
+        if (result.Books == null || result.Books.Count == 0)
+        {
             return new List<ReviewCandidate>();
         }
 
