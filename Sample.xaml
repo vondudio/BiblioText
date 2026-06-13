@@ -421,15 +421,27 @@
                     TextTrimming="CharacterEllipsis"
                     Text="Ready"
                     AutomationProperties.Name="Scan status" />
-                <TextBlock
+                <StackPanel
                     Grid.Column="1"
-                    x:Name="DetectionCountText"
-                    FontSize="12"
-                    Opacity="0.8"
+                    Orientation="Horizontal"
+                    Spacing="12"
                     VerticalAlignment="Center"
-                    Margin="12,0,0,0"
-                    Text=""
-                    AutomationProperties.Name="Detection and selection counts" />
+                    Margin="12,0,0,0">
+                    <TextBlock
+                        x:Name="DetectionCountText"
+                        FontSize="12"
+                        Opacity="0.8"
+                        VerticalAlignment="Center"
+                        Text=""
+                        AutomationProperties.Name="Detection count" />
+                    <TextBlock
+                        x:Name="SelectionCountText"
+                        FontSize="12"
+                        Opacity="0.8"
+                        VerticalAlignment="Center"
+                        Text=""
+                        AutomationProperties.Name="Selection count" />
+                </StackPanel>
             </Grid>
         </Border>
     </Grid>

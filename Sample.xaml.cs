@@ -1971,11 +1971,13 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         if (_overlayCache == null || _overlayCache.BoxPredictions.Count == 0)
         {
             DetectionCountText.Text = string.Empty;
+            SelectionCountText.Text = string.Empty;
             return;
         }
         int total = _overlayCache.BoxPredictions.Count(p => p?.Box != null);
         int selected = _overlayCache.BoxPredictions.Count(p => p?.Box != null && !p.IsExcluded);
-        DetectionCountText.Text = $"Detections: {total}  \u2022  Selected: {selected}";
+        DetectionCountText.Text = $"Detections: {total}";
+        SelectionCountText.Text = $"Selected: {selected}";
     }
 
     private static (double Width, double Height) GetSourcePixelSize(BitmapImage img)
