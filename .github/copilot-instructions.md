@@ -59,10 +59,27 @@ Do not wrap bound controls (TextBox, etc.) in additional Grid/StackPanel contain
 
 The XAML `Value="0.20"` on `ConfidenceSlider` is **overridden at startup** by:
 ```csharp
-ConfidenceSlider.Value = initial.DefaultConfidence;  // in page load
+ConfidenceSlider.Value = initial.DefaultConfidence;  // in OnNavigatedTo
 ConfidenceSlider.Value = model.DefaultConfidence;    // on model change
 ```
-To change the default, modify the code-behind assignment, not just the XAML attribute.
+To change the default, edit the model's `DefaultConfidence` in `ModelRegistry.All`
+(in `Models/ModelInfo.cs`) — **not** the XAML attribute and **not** the
+assignment in code-behind. The currently-preferred model is whatever
+`ModelRegistry.DefaultForViewing` returns (today: `yolo26l`).
+
+### BitmapImage.PixelWidth is async — don't size overlays from it
+
+`BitmapFunctions.EncodeBitmapToBitmapImage` calls `BitmapImage.SetSource`, which
+decodes the PNG **asynchronously**. `PixelWidth` / `PixelHeight` stay at 0 until
+the decode completes, so anything that runs synchronously right after (e.g.
+sizing the scan pane's `BoxOverlay` Canvas, clamping draw-mode pointer coords,
+laying out children at pixel offsets) will see zeros and silently lay things out
+in a 0×0 coordinate space.
+
+The reliable size source for the loaded image is `ImageItem.SourceBitmap.Width`
+and `SourceBitmap.Height` (a synchronous System.Drawing.Bitmap). The scan
+pane's `RefreshBoxOverlay` reads from there and only falls back to
+`BitmapImage.PixelWidth/Height` when no SourceBitmap is available.
 
 ### AI title extraction response format
 

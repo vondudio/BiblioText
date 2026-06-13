@@ -211,7 +211,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         ModelPicker.SelectedItem = initial;
         _suppressModelChange = false;
 
-        ConfidenceSlider.Value = 0.20;
+        ConfidenceSlider.Value = initial.DefaultConfidence;
 
         try
         {
@@ -1913,9 +1913,21 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
     private void RefreshBoxOverlay(CachedOutput cached)
     {
         _overlayCache = cached;
-        var size = GetSourcePixelSize(cached.Image);
-        _overlayImageWidth = size.Width;
-        _overlayImageHeight = size.Height;
+        // Read the overlay's working dimensions from the underlying GDI bitmap —
+        // BitmapImage.PixelWidth/PixelHeight is 0 until the async PNG decode
+        // completes, and we'd otherwise clamp draw-mode coords to (0,0) and
+        // discard the rubber-band as "too small" on release.
+        var item = _activeImage;
+        double w = item?.SourceBitmap?.Width ?? 0;
+        double h = item?.SourceBitmap?.Height ?? 0;
+        if (w <= 0 || h <= 0)
+        {
+            var size = GetSourcePixelSize(cached.Image);
+            w = size.Width;
+            h = size.Height;
+        }
+        _overlayImageWidth = w;
+        _overlayImageHeight = h;
         BoxOverlay.Width = _overlayImageWidth;
         BoxOverlay.Height = _overlayImageHeight;
         BoxOverlay.Children.Clear();
