@@ -527,6 +527,7 @@ internal sealed class BookDisplay
     public Uri? CoverImageUri { get; }
     public BitmapImage? CoverImage { get; }
     public Visibility CoverVisibility => CoverImage != null ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility SpineVisibility => CoverImage == null ? Visibility.Visible : Visibility.Collapsed;
     public IReadOnlyList<ProviderBadge> ProviderBadges { get; }
     public string LocationName { get; }
     public string LocationDisplay => string.IsNullOrEmpty(LocationName) ? "" : $"📍 {LocationName}";

@@ -142,13 +142,14 @@
                                             FontSize="20"
                                             Opacity="0.3" />
                                         <Image
+                                            Source="{Binding SpineImage}"
+                                            Stretch="UniformToFill"
+                                            Visibility="{Binding SpineVisibility}"
+                                            AutomationProperties.Name="{Binding Title}" />
+                                        <Image
                                             Source="{Binding CoverImage}"
                                             Stretch="UniformToFill"
                                             Visibility="{Binding CoverVisibility}"
-                                            AutomationProperties.Name="{Binding Title}" />
-                                        <Image
-                                            Source="{Binding SpineImage}"
-                                            Stretch="UniformToFill"
                                             AutomationProperties.Name="{Binding Title}" />
                                         <Border
                                             HorizontalAlignment="Left"
