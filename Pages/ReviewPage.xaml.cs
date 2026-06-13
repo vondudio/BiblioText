@@ -374,7 +374,8 @@ public sealed partial class ReviewPage : Page
 
             ReviewStatusText.Text = $"Fetching descriptions for {books.Count} book(s)...";
 
-            var descService = new BookDescriptionService(settingsStore);
+            var descService = App.Services?.GetService<BookDescriptionService>()
+                ?? new BookDescriptionService(settingsStore);
             var bookList = books.Select(b => (b.Id, b.Title, b.Author)).ToList();
             var descriptionResult = await descService.GetDescriptionsResultAsync(bookList);
             if (!descriptionResult.IsSuccess)
@@ -400,6 +401,9 @@ public sealed partial class ReviewPage : Page
                 {
                     book.ShortDescription = desc.ShortDescription;
                     book.LongDescription = desc.LongDescription;
+                    book.IsDescriptionGrounded = desc.IsGrounded;
+                    book.DescriptionSourcesJson = desc.SourcesJson;
+                    book.DescriptionGeneratedAt = desc.GeneratedAt;
                     await repo.UpdateBookAsync(book);
 
                     var searchService = App.SemanticSearchService;

@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.Net.Http;
+using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -18,10 +19,14 @@ internal sealed class BookDescriptionService
 {
     private readonly HttpClient _httpClient = AzureOpenAiHttp.CreateClient();
     private readonly ISettingsStore _settingsStore;
+    private readonly IBookMetadataLookupService _metadataLookupService;
 
-    public BookDescriptionService(ISettingsStore settingsStore)
+    public BookDescriptionService(
+        ISettingsStore settingsStore,
+        IBookMetadataLookupService? metadataLookupService = null)
     {
         _settingsStore = settingsStore;
+        _metadataLookupService = metadataLookupService ?? new OpenLibraryBookMetadataLookupService();
     }
 
     public async Task<List<BookDescription>> GetDescriptionsAsync(
@@ -40,12 +45,28 @@ internal sealed class BookDescriptionService
         if (!settings.IsConfigured)
             return BookDescriptionBatchResult.Failure(AzureOpenAiErrorKind.NotConfigured, "Azure OpenAI not configured.");
 
-        // Build the book list for the prompt
+        var metadataByBook = await LookupMetadataAsync(books, ct);
+
+        // Build the book list and retrieved source context for the prompt.
         var sb = new StringBuilder();
         for (int i = 0; i < books.Count; i++)
         {
             var (_, title, author) = books[i];
             sb.AppendLine($"{i + 1}. \"{title}\" by {author ?? "Unknown"}");
+            var sources = metadataByBook[i];
+            if (sources.Count == 0)
+            {
+                sb.AppendLine("   Sources: none found");
+            }
+            else
+            {
+                for (int sourceIndex = 0; sourceIndex < sources.Count; sourceIndex++)
+                {
+                    var source = sources[sourceIndex];
+                    sb.AppendLine($"   Source {sourceIndex + 1}: {source.Provider} | {source.Title} | {source.Url}");
+                    sb.AppendLine($"   Snippet: {source.Snippet}");
+                }
+            }
         }
 
         var requestBody = new
@@ -56,15 +77,16 @@ internal sealed class BookDescriptionService
                 {
                     role = "system",
                     content = """
-                        You are a knowledgeable book reference assistant. Given a list of books (title and author),
+                        You are a careful book reference assistant. Given a list of books and source snippets,
                         return a JSON object with descriptions for each book.
-                        
+                         
                         For each book provide:
                         - "short_description": 1-2 sentences describing what the book is about
                         - "long_description": A concise summary paragraph (3-5 sentences) covering the book's main themes, content, and significance
-                        
-                        If you don't recognize a book, provide your best guess based on the title and author,
-                        or state "Description unavailable" for both fields.
+                         
+                        Use only the supplied source snippets for factual claims. If no sources are supplied,
+                        or the supplied sources do not appear to match the requested title and author,
+                        set both description fields to "Description unavailable".
                         """
                 },
                 new
@@ -82,7 +104,7 @@ internal sealed class BookDescriptionService
                           ]
                         }
 
-                        Books:
+                        Books and source snippets:
                         {{sb}}
                         """
                 }
@@ -144,7 +166,14 @@ internal sealed class BookDescriptionService
                     {
                         BookId = books[idx].BookId,
                         ShortDescription = desc.ShortDescription,
-                        LongDescription = desc.LongDescription
+                        LongDescription = desc.LongDescription,
+                        IsGrounded = metadataByBook[idx].Count > 0 &&
+                            !IsUnavailable(desc.ShortDescription) &&
+                            !IsUnavailable(desc.LongDescription),
+                        SourcesJson = metadataByBook[idx].Count == 0
+                            ? null
+                            : JsonSerializer.Serialize(metadataByBook[idx]),
+                        GeneratedAt = DateTime.UtcNow
                     });
                 }
             }
@@ -158,6 +187,39 @@ internal sealed class BookDescriptionService
                 ex.Message);
         }
     }
+
+    private async Task<List<List<BookMetadataSource>>> LookupMetadataAsync(
+        IReadOnlyList<(int BookId, string Title, string? Author)> books,
+        CancellationToken ct)
+    {
+        var results = new List<List<BookMetadataSource>>(books.Count);
+        foreach (var (_, title, author) in books)
+        {
+            try
+            {
+                var sources = await _metadataLookupService.LookupAsync(title, author, ct);
+                results.Add(sources.ToList());
+            }
+            catch (HttpRequestException)
+            {
+                results.Add([]);
+            }
+            catch (TaskCanceledException) when (!ct.IsCancellationRequested)
+            {
+                results.Add([]);
+            }
+            catch (JsonException)
+            {
+                results.Add([]);
+            }
+        }
+
+        return results;
+    }
+
+    private static bool IsUnavailable(string? value) =>
+        string.IsNullOrWhiteSpace(value) ||
+        value.Contains("Description unavailable", StringComparison.OrdinalIgnoreCase);
 }
 
 public sealed class BookDescriptionBatchResult
@@ -195,6 +257,9 @@ public sealed class BookDescription
     public int BookId { get; set; }
     public string? ShortDescription { get; set; }
     public string? LongDescription { get; set; }
+    public bool IsGrounded { get; set; }
+    public string? SourcesJson { get; set; }
+    public DateTime GeneratedAt { get; set; }
 }
 
 internal sealed class DescriptionResponse

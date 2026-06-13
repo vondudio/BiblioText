@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using BiblioText.Models;
 using BiblioText.Persistence;
@@ -480,6 +481,8 @@ internal sealed class BookDisplay
         DetectionIndex = book.DetectionIndex;
         LocationName = locationName ?? "";
         IsDuplicate = book.IsDuplicate;
+        IsDescriptionGrounded = book.IsDescriptionGrounded;
+        DescriptionSourcesJson = book.DescriptionSourcesJson;
         CreatedAtDisplay = book.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd");
 
         if (!string.IsNullOrEmpty(SpineImagePath) && File.Exists(SpineImagePath))
@@ -493,7 +496,17 @@ internal sealed class BookDisplay
     public string Author { get; }
     public string ShortDescription { get; }
     public string LongDescription { get; }
-    public string LongDescriptionDisplay => string.IsNullOrWhiteSpace(LongDescription) ? "No description available" : LongDescription;
+    public string LongDescriptionDisplay
+    {
+        get
+        {
+            var description = string.IsNullOrWhiteSpace(LongDescription) ? "No description available" : LongDescription;
+            var sourceDisplay = DescriptionSourceDisplay;
+            return string.IsNullOrWhiteSpace(sourceDisplay)
+                ? description
+                : $"{description}\n\nSources:\n{sourceDisplay}";
+        }
+    }
     public Visibility HasDescription => string.IsNullOrEmpty(ShortDescription) ? Visibility.Collapsed : Visibility.Visible;
     public bool HasBookshelfImage => !string.IsNullOrWhiteSpace(BookshelfImagePath) && File.Exists(BookshelfImagePath);
     public string? SpineImagePath { get; }
@@ -504,6 +517,45 @@ internal sealed class BookDisplay
     public string LocationDisplay => string.IsNullOrEmpty(LocationName) ? "" : $"📍 {LocationName}";
     public bool IsDuplicate { get; }
     public Visibility DuplicateVisibility => IsDuplicate ? Visibility.Visible : Visibility.Collapsed;
+    public bool IsDescriptionGrounded { get; }
+    public string? DescriptionSourcesJson { get; }
+    public Visibility GroundedVisibility => IsDescriptionGrounded ? Visibility.Visible : Visibility.Collapsed;
     public string CreatedAtDisplay { get; }
     public string DetectionLabel => DetectionIndex.HasValue ? $"#{DetectionIndex}" : "";
+
+    private string DescriptionSourceDisplay
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(DescriptionSourcesJson))
+            {
+                return string.Empty;
+            }
+
+            try
+            {
+                var sources = JsonSerializer.Deserialize<List<DescriptionSourceDisplay>>(DescriptionSourcesJson);
+                if (sources == null || sources.Count == 0)
+                {
+                    return string.Empty;
+                }
+
+                return string.Join(
+                    "\n",
+                    sources
+                        .Where(source => !string.IsNullOrWhiteSpace(source.Url))
+                        .Select(source => $"- {source.Provider}: {source.Url}"));
+            }
+            catch (JsonException)
+            {
+                return string.Empty;
+            }
+        }
+    }
+}
+
+internal sealed class DescriptionSourceDisplay
+{
+    public string? Provider { get; set; }
+    public string? Url { get; set; }
 }

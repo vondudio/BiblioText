@@ -169,6 +169,13 @@
                                         Visibility="{Binding DuplicateVisibility}">
                                         <TextBlock Text="Duplicate" FontSize="11" />
                                     </Border>
+                                    <Border
+                                        Background="{ThemeResource SystemFillColorSuccessBackgroundBrush}"
+                                        CornerRadius="4"
+                                        Padding="4,1"
+                                        Visibility="{Binding GroundedVisibility}">
+                                        <TextBlock Text="Sourced" FontSize="11" />
+                                    </Border>
                                 </StackPanel>
                             </StackPanel>
 

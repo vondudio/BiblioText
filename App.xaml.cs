@@ -27,6 +27,8 @@ public partial class App : Application
         services.AddSingleton<AzureOpenAiAnalysisClient>();
         services.AddSingleton<ScanWorkflowService>();
         services.AddSingleton<IReviewApplicationService, ReviewApplicationService>();
+        services.AddSingleton<IBookMetadataLookupService, OpenLibraryBookMetadataLookupService>();
+        services.AddSingleton<BookDescriptionService>();
         services.AddSingleton<SemanticSearchService>();
         Services = services.BuildServiceProvider();
 
