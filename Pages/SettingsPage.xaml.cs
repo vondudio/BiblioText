@@ -2,6 +2,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using System;
 using System.Net.Http;
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using BiblioText.Settings;
@@ -14,7 +15,20 @@ public sealed partial class SettingsPage : Page
     public SettingsPage()
     {
         this.InitializeComponent();
+        VersionText.Text = $"Version {GetAppVersion()}";
         this.Loaded += SettingsPage_Loaded;
+    }
+
+    private static string GetAppVersion()
+    {
+        var asm = typeof(SettingsPage).Assembly;
+        var info = asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+        if (!string.IsNullOrWhiteSpace(info))
+        {
+            var plus = info.IndexOf('+');
+            return plus > 0 ? info[..plus] : info;
+        }
+        return asm.GetName().Version?.ToString() ?? "0.0.0";
     }
 
     private void SettingsPage_Loaded(object sender, RoutedEventArgs e)
