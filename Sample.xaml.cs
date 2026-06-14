@@ -392,9 +392,8 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
             {
                 DefaultImage.Source = cached.Image;
                 RefreshBoxOverlay(cached);
-                StatusText.Text = $"(cached) model={_currentModel.Id}  conf={ConfidenceSlider.Value:F2}  detections={cached.BoxPredictions.Count}";
-                StatusBar.Visibility = Visibility.Visible;
-                ExtractButton.IsEnabled = cached.BoxPredictions.Count > 0;
+                UpdateStatusText();
+                ExtractButton.IsEnabled = cached.BoxPredictions.Count(p => !p.IsExcluded) > 0;
                 return;
             }
 
@@ -1802,6 +1801,11 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
             Image = outputImage,
             BoxPredictions = detectionResult.Box,
             MaskedPredictions = detectionResult.Mask,
+            PreprocessMs = preprocessMs,
+            InferenceMs = inferenceMs,
+            PostprocessMs = postprocessMs,
+            TotalMs = swTotal.ElapsedMilliseconds,
+            HasSegmentation = detectionResult.Mask is { Count: > 0 },
         };
         item.Outputs[cacheKey] = cachedOutput;
 
@@ -1814,11 +1818,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
             {
                 DefaultImage.Source = outputImage;
                 RefreshBoxOverlay(cachedOutput);
-                string segNote = detectionResult.Mask is { Count: > 0 } ? "  (seg)" : string.Empty;
-                StatusText.Text =
-                    $"{detectionCount} detection{(detectionCount == 1 ? string.Empty : "s")}{segNote}  •  " +
-                    $"pre {preprocessMs} ms  •  infer {inferenceMs} ms  •  post {postprocessMs} ms  •  total {swTotal.ElapsedMilliseconds} ms";
-                StatusBar.Visibility = Visibility.Visible;
+                UpdateStatusText();
                 ExtractButton.IsEnabled = detectionCount > 0;
             }
             Loader.IsActive = false;
@@ -1931,7 +1931,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         }
         _penBarrelPressed = false;
         _penPointerId = 0;
-        UpdateDetectionCountLabel();
+        UpdateStatusText();
     }
 
     private void RefreshBoxOverlay(CachedOutput cached)
@@ -1963,19 +1963,25 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
             BoxOverlay.Children.Add(rect);
         }
 
-        UpdateDetectionCountLabel();
+        UpdateStatusText();
     }
 
-    private void UpdateDetectionCountLabel()
+    private void UpdateStatusText()
     {
         if (_overlayCache == null || _overlayCache.BoxPredictions.Count == 0)
         {
-            DetectionCountText.Text = string.Empty;
+            StatusBar.Visibility = Visibility.Collapsed;
             return;
         }
         int total = _overlayCache.BoxPredictions.Count(p => p?.Box != null);
         int selected = _overlayCache.BoxPredictions.Count(p => p?.Box != null && !p.IsExcluded);
-        DetectionCountText.Text = $"Detections: {total}    Selected: {selected}";
+        string segNote = _overlayCache.HasSegmentation ? "  (seg)" : string.Empty;
+        string perfSuffix = _overlayCache.TotalMs > 0
+            ? $"  •  pre {_overlayCache.PreprocessMs} ms  •  infer {_overlayCache.InferenceMs} ms  •  post {_overlayCache.PostprocessMs} ms  •  total {_overlayCache.TotalMs} ms"
+            : string.Empty;
+        StatusText.Text =
+            $"{total} detection{(total == 1 ? string.Empty : "s")}{segNote}  •  Selected: {selected}{perfSuffix}";
+        StatusBar.Visibility = Visibility.Visible;
     }
 
     private static (double Width, double Height) GetSourcePixelSize(BitmapImage img)
@@ -2054,7 +2060,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         if (_drawMode) return;
         p.IsExcluded = !p.IsExcluded;
         ApplyExclusionVisual(rect, p.IsExcluded);
-        UpdateDetectionCountLabel();
+        UpdateStatusText();
         e.Handled = true;
     }
 
@@ -2065,7 +2071,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         BoxOverlay.Children.Remove(rect);
         ExtractButton.IsEnabled = _overlayCache.BoxPredictions.Count(x => !x.IsExcluded) > 0;
         ScanStatusText.Text = $"Deleted box. Detections: {_overlayCache.BoxPredictions.Count}.";
-        UpdateDetectionCountLabel();
+        UpdateStatusText();
     }
 
     // ---------------- Draw-new-box mode ----------------
@@ -2346,7 +2352,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         BoxOverlay.Children.Add(rect);
         ExtractButton.IsEnabled = _overlayCache.BoxPredictions.Count(p => !p.IsExcluded) > 0;
         ScanStatusText.Text = $"Added manual box. Detections: {_overlayCache.BoxPredictions.Count}.";
-        UpdateDetectionCountLabel();
+        UpdateStatusText();
         if (source == DrawSource.Toggle) DrawBoxButton.IsChecked = false; // one-shot
     }
 }

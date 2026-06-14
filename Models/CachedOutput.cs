@@ -21,4 +21,13 @@ internal sealed class CachedOutput
     public required List<Prediction> BoxPredictions { get; init; }
 
     public IReadOnlyList<MaskedPrediction>? MaskedPredictions { get; init; }
+
+    // Perf snapshot from the detection run that produced this cache entry.
+    // Used to redraw the acrylic status chip with consistent timings when
+    // selections change or when a cache hit re-displays this entry.
+    public long PreprocessMs { get; init; }
+    public long InferenceMs { get; init; }
+    public long PostprocessMs { get; init; }
+    public long TotalMs { get; init; }
+    public bool HasSegmentation { get; init; }
 }
