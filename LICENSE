@@ -23,15 +23,30 @@ SOFTWARE.
 
 ---
 
-NOTE ON BUNDLED AND DOWNLOADED MODELS
+NOTE ON MODEL WEIGHTS
 
-This repository does not redistribute any ONNX model weights.
+This repository contains source code only. It bundles, hosts, and redistributes
+NO machine-learning model weights of any kind — there are no .onnx (or .data)
+files tracked in git, and none are shipped in any release built from this source
+as published. All models are supplied by the end user at runtime, downloaded to
+the user's own machine. As a result, no model license attaches to this
+MIT-licensed source distribution.
 
-- YOLO26 weights are licensed AGPL-3.0 by Ultralytics. They are fetched by the
-  user via scripts/download-models.ps1 (or exported from the Ultralytics .pt
-  files) and are NOT part of this MIT-licensed source. Using or redistributing
-  those weights is subject to Ultralytics' AGPL-3.0 terms and may require an
-  Ultralytics Enterprise License for closed-source commercial distribution:
+The decisions below only become relevant if you build a packaged artifact
+(installer / MSIX / release asset) that embeds a weights file, or otherwise
+redistribute weights yourself:
+
+- YOLO26 weights are licensed AGPL-3.0 by Ultralytics. The app fetches them only
+  onto the user's machine via scripts/download-models.ps1 (or the user exports
+  them from the Ultralytics .pt files). They are NEVER part of this repository or
+  its source distribution. Anyone who downloads, uses, or redistributes those
+  weights is subject to Ultralytics' AGPL-3.0 terms and may need an Ultralytics
+  Enterprise License for closed-source commercial distribution:
   https://www.ultralytics.com/license
+  Do NOT embed AGPL weights in a packaged build you intend to ship under MIT.
+- If you want to ship a build with a model included, choose a permissively
+  licensed model (e.g. an Apache-2.0 or MIT one) and include its license/NOTICE
+  in that artifact.
 - COCO class labels derive from the COCO 2017 dataset (Common Objects in
-  Context).
+  Context); the dataset annotations are licensed CC BY 4.0.
+

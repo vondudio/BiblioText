@@ -344,13 +344,20 @@ This project is licensed under the **MIT License** — see [`LICENSE`](LICENSE).
 
 - The project began as a fork of Microsoft's **AI Dev Gallery** sample (MIT,
   © Microsoft Corporation); that original copyright notice is retained in `LICENSE`.
-- **No ONNX model weights are redistributed in this repo.** `yolov4.onnx` and the
-  YOLO26 weights are gitignored and fetched/exported by the user.
+- **This repository contains source code only — it bundles and redistributes no
+  model weights.** There are no `.onnx`/`.data` files tracked in git; every model
+  is supplied by the end user at runtime and downloaded to their own machine, so
+  no model license attaches to this MIT-licensed source.
 - **Ultralytics YOLO26** weights and any models you derive from them are **AGPL-3.0**.
-  An [Ultralytics Enterprise License](https://www.ultralytics.com/license) is required
-  for closed-source commercial distribution. This obligation is on whoever downloads
-  and uses those weights — it does not apply to this MIT-licensed source.
-- COCO labels come from the COCO 2017 dataset (Common Objects in Context).
+  That obligation falls on whoever downloads and uses those weights on their machine
+  — it does not touch this source. Just don't embed AGPL weights in a packaged build
+  (installer / MSIX / release asset) you intend to ship under MIT; if you want a
+  build with a model included, pick a permissively licensed one (Apache-2.0 / MIT)
+  and ship its license/NOTICE with it. An
+  [Ultralytics Enterprise License](https://www.ultralytics.com/license) is the paid
+  path for closed-source commercial distribution of YOLO26.
+- COCO class labels derive from the COCO 2017 dataset (Common Objects in Context);
+  the dataset annotations are licensed CC BY 4.0.
 
 ## Privacy / data flow
 
