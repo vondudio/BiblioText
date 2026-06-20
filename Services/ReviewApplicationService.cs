@@ -53,6 +53,7 @@ internal sealed class ReviewApplicationService : IReviewApplicationService
                 Author = string.IsNullOrWhiteSpace(candidate.EditedAuthor) ? candidate.DetectedAuthor : candidate.EditedAuthor,
                 LocationId = locationId,
                 DetectionIndex = candidate.Index > 0 ? candidate.Index : null,
+                SpineBoxNorm = FormatBoxNorm(candidate),
                 BookshelfImagePath = sourceImagePath,
                 CreatedAt = DateTime.UtcNow
             };
@@ -115,6 +116,20 @@ internal sealed class ReviewApplicationService : IReviewApplicationService
         }
 
         return new ReviewSaveResult(booksToSave, acceptedCandidates.ToList(), duplicateCount);
+    }
+
+    private static string? FormatBoxNorm(ReviewCandidate candidate)
+    {
+        if (candidate.BoxNormX is not double x || candidate.BoxNormY is not double y ||
+            candidate.BoxNormWidth is not double w || candidate.BoxNormHeight is not double h ||
+            w <= 0 || h <= 0)
+        {
+            return null;
+        }
+
+        return string.Create(
+            System.Globalization.CultureInfo.InvariantCulture,
+            $"{x:0.#####},{y:0.#####},{w:0.#####},{h:0.#####}");
     }
 
     private static string NormalizeBookKey(string title, string? author)

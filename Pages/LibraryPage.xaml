@@ -316,7 +316,20 @@
                             <Image
                                 x:Name="BookshelfOverlayImage"
                                 Stretch="Uniform"
+                                ImageOpened="BookshelfOverlayImage_ImageOpened"
+                                SizeChanged="BookshelfOverlayImage_SizeChanged"
                                 AutomationProperties.Name="Bookshelf scan image" />
+                            <Canvas
+                                x:Name="BookshelfBoxCanvas"
+                                IsHitTestVisible="False">
+                                <Rectangle
+                                    x:Name="DetectionBox"
+                                    Stroke="#FF3B30"
+                                    StrokeThickness="3"
+                                    RadiusX="2"
+                                    RadiusY="2"
+                                    Visibility="Collapsed" />
+                            </Canvas>
                             <Border
                                 x:Name="SpineOverlayBorder"
                                 HorizontalAlignment="Right"

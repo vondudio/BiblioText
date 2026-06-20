@@ -993,6 +993,19 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
             {
                 var (crop, result) = extracted[i];
 
+                double? bnx = null, bny = null, bnw = null, bnh = null;
+                if (sourceBitmap.Width > 0 && sourceBitmap.Height > 0)
+                {
+                    double sw = sourceBitmap.Width;
+                    double sh = sourceBitmap.Height;
+                    double x = Math.Clamp(crop.Box.Xmin / sw, 0, 1);
+                    double y = Math.Clamp(crop.Box.Ymin / sh, 0, 1);
+                    bnx = x;
+                    bny = y;
+                    bnw = Math.Clamp(crop.Box.Xmax / sw, 0, 1) - x;
+                    bnh = Math.Clamp(crop.Box.Ymax / sh, 0, 1) - y;
+                }
+
                 candidates.Add(new Models.ReviewCandidate
                 {
                     Index = i + 1,
@@ -1004,7 +1017,11 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
                     CropJpeg = crop.Jpeg,
                     PixelWidth = crop.PixelWidth,
                     PixelHeight = crop.PixelHeight,
-                    Confidence = result.Confidence
+                    Confidence = result.Confidence,
+                    BoxNormX = bnx,
+                    BoxNormY = bny,
+                    BoxNormWidth = bnw,
+                    BoxNormHeight = bnh
                 });
             }
             _latestReviewCandidates = candidates;

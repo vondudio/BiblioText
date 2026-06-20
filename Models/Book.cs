@@ -16,6 +16,14 @@ public sealed class Book
     public string? SpineImagePath { get; set; }
     public string? BookshelfImagePath { get; set; }
     public int? DetectionIndex { get; set; }
+
+    /// <summary>
+    /// Detection bounding box on <see cref="BookshelfImagePath"/>, stored as
+    /// normalized 0..1 coordinates in the form "x,y,w,h" (invariant culture).
+    /// Null for books saved before this was captured, or from full-image AI analysis.
+    /// </summary>
+    public string? SpineBoxNorm { get; set; }
+
     public DateTime CreatedAt { get; set; }
     public DateTime? ModifiedAt { get; set; }
     public bool IsDuplicate { get; set; }

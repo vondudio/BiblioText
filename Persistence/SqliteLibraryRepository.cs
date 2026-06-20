@@ -61,6 +61,7 @@ public sealed class SqliteLibraryRepository : ILibraryRepository, IDisposable
                 spine_image_path TEXT,
                 bookshelf_image_path TEXT,
                 detection_index INTEGER,
+                spine_box_norm TEXT,
                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
                 modified_at TEXT,
                 is_duplicate INTEGER NOT NULL DEFAULT 0,
@@ -105,6 +106,12 @@ public sealed class SqliteLibraryRepository : ILibraryRepository, IDisposable
         {
             using var alter = _connection!.CreateCommand();
             alter.CommandText = "ALTER TABLE books ADD COLUMN detection_index INTEGER;";
+            await alter.ExecuteNonQueryAsync();
+        }
+        if (!columns.Contains("spine_box_norm"))
+        {
+            using var alter = _connection!.CreateCommand();
+            alter.CommandText = "ALTER TABLE books ADD COLUMN spine_box_norm TEXT;";
             await alter.ExecuteNonQueryAsync();
         }
         if (!columns.Contains("short_description"))
@@ -323,8 +330,8 @@ public sealed class SqliteLibraryRepository : ILibraryRepository, IDisposable
         using var cmd = _connection!.CreateCommand();
         cmd.Transaction = transaction;
         cmd.CommandText = """
-            INSERT INTO books (title, author, short_description, long_description, scan_id, location_id, spine_image_path, bookshelf_image_path, detection_index, created_at, is_duplicate, is_description_grounded, description_sources_json, description_generated_at, notes)
-            VALUES (@title, @author, @shortDesc, @longDesc, @scanId, @locationId, @spinePath, @bookshelfPath, @detectionIndex, @createdAt, @isDuplicate, @isDescriptionGrounded, @descriptionSourcesJson, @descriptionGeneratedAt, @notes);
+            INSERT INTO books (title, author, short_description, long_description, scan_id, location_id, spine_image_path, bookshelf_image_path, detection_index, spine_box_norm, created_at, is_duplicate, is_description_grounded, description_sources_json, description_generated_at, notes)
+            VALUES (@title, @author, @shortDesc, @longDesc, @scanId, @locationId, @spinePath, @bookshelfPath, @detectionIndex, @spineBoxNorm, @createdAt, @isDuplicate, @isDescriptionGrounded, @descriptionSourcesJson, @descriptionGeneratedAt, @notes);
             SELECT last_insert_rowid();
             """;
         cmd.Parameters.AddWithValue("@title", book.Title);
@@ -336,6 +343,7 @@ public sealed class SqliteLibraryRepository : ILibraryRepository, IDisposable
         cmd.Parameters.AddWithValue("@spinePath", (object?)book.SpineImagePath ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@bookshelfPath", (object?)book.BookshelfImagePath ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@detectionIndex", (object?)book.DetectionIndex ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@spineBoxNorm", (object?)book.SpineBoxNorm ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@createdAt", book.CreatedAt.ToString("o"));
         cmd.Parameters.AddWithValue("@isDuplicate", book.IsDuplicate ? 1 : 0);
         cmd.Parameters.AddWithValue("@isDescriptionGrounded", book.IsDescriptionGrounded ? 1 : 0);
@@ -358,7 +366,7 @@ public sealed class SqliteLibraryRepository : ILibraryRepository, IDisposable
             cmd.CommandText = """
                 UPDATE books SET title=@title, author=@author, short_description=@shortDesc, long_description=@longDesc,
                     location_id=@locationId, spine_image_path=@spinePath, bookshelf_image_path=@bookshelfPath,
-                    detection_index=@detectionIndex, modified_at=@modifiedAt, is_duplicate=@isDuplicate,
+                    detection_index=@detectionIndex, spine_box_norm=@spineBoxNorm, modified_at=@modifiedAt, is_duplicate=@isDuplicate,
                     is_description_grounded=@isDescriptionGrounded, description_sources_json=@descriptionSourcesJson,
                     description_generated_at=@descriptionGeneratedAt, notes=@notes
                 WHERE id=@id;
@@ -372,6 +380,7 @@ public sealed class SqliteLibraryRepository : ILibraryRepository, IDisposable
             cmd.Parameters.AddWithValue("@spinePath", (object?)book.SpineImagePath ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@bookshelfPath", (object?)book.BookshelfImagePath ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@detectionIndex", (object?)book.DetectionIndex ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@spineBoxNorm", (object?)book.SpineBoxNorm ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@modifiedAt", DateTime.UtcNow.ToString("o"));
             cmd.Parameters.AddWithValue("@isDuplicate", book.IsDuplicate ? 1 : 0);
             cmd.Parameters.AddWithValue("@isDescriptionGrounded", book.IsDescriptionGrounded ? 1 : 0);
@@ -695,6 +704,7 @@ public sealed class SqliteLibraryRepository : ILibraryRepository, IDisposable
             SpineImagePath = reader.IsDBNull(reader.GetOrdinal("spine_image_path")) ? null : reader.GetString(reader.GetOrdinal("spine_image_path")),
             BookshelfImagePath = reader.IsDBNull(reader.GetOrdinal("bookshelf_image_path")) ? null : reader.GetString(reader.GetOrdinal("bookshelf_image_path")),
             DetectionIndex = reader.IsDBNull(reader.GetOrdinal("detection_index")) ? null : reader.GetInt32(reader.GetOrdinal("detection_index")),
+            SpineBoxNorm = reader.IsDBNull(reader.GetOrdinal("spine_box_norm")) ? null : reader.GetString(reader.GetOrdinal("spine_box_norm")),
             CreatedAt = DateTime.Parse(reader.GetString(reader.GetOrdinal("created_at"))),
             ModifiedAt = reader.IsDBNull(reader.GetOrdinal("modified_at")) ? null : DateTime.Parse(reader.GetString(reader.GetOrdinal("modified_at"))),
             IsDuplicate = reader.GetInt32(reader.GetOrdinal("is_duplicate")) == 1,

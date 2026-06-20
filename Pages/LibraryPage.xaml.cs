@@ -25,6 +25,7 @@ public sealed partial class LibraryPage : Page
     private int? _selectedLocationId;
     private string? _sortOption;
     private string? _statusFilter;
+    private (double X, double Y, double W, double H)? _pendingDetectionBox;
 
     public LibraryPage()
     {
@@ -279,8 +280,14 @@ public sealed partial class LibraryPage : Page
 
         BookshelfOverlayImage.Source = new BitmapImage(new Uri(book.BookshelfImagePath));
 
-        // Overlay the spine scan on top of the bookshelf image
-        if (!string.IsNullOrWhiteSpace(book.SpineImagePath) && File.Exists(book.SpineImagePath))
+        // If the original detection box was captured, draw it on the bookshelf photo.
+        _pendingDetectionBox = TryParseBoxNorm(book.SpineBoxNorm);
+        bool hasBox = _pendingDetectionBox.HasValue;
+        DetectionBox.Visibility = Visibility.Collapsed;
+        PositionDetectionBox();
+
+        // Fall back to the corner spine thumbnail only when there is no positioned box.
+        if (!hasBox && !string.IsNullOrWhiteSpace(book.SpineImagePath) && File.Exists(book.SpineImagePath))
         {
             SpineOverlayImage.Source = new BitmapImage(new Uri(book.SpineImagePath));
             SpineOverlayBorder.Visibility = Visibility.Visible;
@@ -293,6 +300,78 @@ public sealed partial class LibraryPage : Page
 
         BookshelfOverlay.Visibility = Visibility.Visible;
         BookshelfOverlayScroller.ChangeView(0, 0, 1.0f, disableAnimation: true);
+    }
+
+    private static (double X, double Y, double W, double H)? TryParseBoxNorm(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var parts = value.Split(',');
+        if (parts.Length != 4)
+        {
+            return null;
+        }
+
+        var ci = System.Globalization.CultureInfo.InvariantCulture;
+        if (double.TryParse(parts[0], System.Globalization.NumberStyles.Float, ci, out var x) &&
+            double.TryParse(parts[1], System.Globalization.NumberStyles.Float, ci, out var y) &&
+            double.TryParse(parts[2], System.Globalization.NumberStyles.Float, ci, out var w) &&
+            double.TryParse(parts[3], System.Globalization.NumberStyles.Float, ci, out var h) &&
+            w > 0 && h > 0)
+        {
+            return (x, y, w, h);
+        }
+
+        return null;
+    }
+
+    private void BookshelfOverlayImage_ImageOpened(object sender, RoutedEventArgs e) => PositionDetectionBox();
+
+    private void BookshelfOverlayImage_SizeChanged(object sender, SizeChangedEventArgs e) => PositionDetectionBox();
+
+    /// <summary>
+    /// Map the stored normalized detection box onto the letterboxed (Stretch=Uniform)
+    /// bookshelf image, accounting for the centering offset and scale.
+    /// </summary>
+    private void PositionDetectionBox()
+    {
+        if (_pendingDetectionBox is not { } box ||
+            BookshelfOverlayImage.Source is not BitmapImage bmp ||
+            bmp.PixelWidth <= 0 || bmp.PixelHeight <= 0)
+        {
+            DetectionBox.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        double containerW = BookshelfOverlayImage.ActualWidth;
+        double containerH = BookshelfOverlayImage.ActualHeight;
+        if (containerW <= 0 || containerH <= 0)
+        {
+            DetectionBox.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        double natW = bmp.PixelWidth;
+        double natH = bmp.PixelHeight;
+        double scale = Math.Min(containerW / natW, containerH / natH);
+        double dispW = natW * scale;
+        double dispH = natH * scale;
+        double offsetX = (containerW - dispW) / 2.0;
+        double offsetY = (containerH - dispH) / 2.0;
+
+        double left = offsetX + (box.X * dispW);
+        double top = offsetY + (box.Y * dispH);
+        double width = box.W * dispW;
+        double height = box.H * dispH;
+
+        Canvas.SetLeft(DetectionBox, left);
+        Canvas.SetTop(DetectionBox, top);
+        DetectionBox.Width = Math.Max(0, width);
+        DetectionBox.Height = Math.Max(0, height);
+        DetectionBox.Visibility = Visibility.Visible;
     }
 
     private async void DescriptionButton_Click(object sender, RoutedEventArgs e)
@@ -655,6 +734,7 @@ internal sealed class BookDisplay
         SpineImagePath = book.SpineImagePath;
         BookshelfImagePath = book.BookshelfImagePath;
         DetectionIndex = book.DetectionIndex;
+        SpineBoxNorm = book.SpineBoxNorm;
         LocationName = locationName ?? "";
         IsDuplicate = book.IsDuplicate;
         IsDescriptionGrounded = book.IsDescriptionGrounded;
@@ -696,6 +776,7 @@ internal sealed class BookDisplay
     public bool HasBookshelfImage => !string.IsNullOrWhiteSpace(BookshelfImagePath) && File.Exists(BookshelfImagePath);
     public string? SpineImagePath { get; }
     public string? BookshelfImagePath { get; }
+    public string? SpineBoxNorm { get; }
     public int? DetectionIndex { get; }
     public BitmapImage? SpineImage { get; }
     public Uri? CoverImageUri { get; }
