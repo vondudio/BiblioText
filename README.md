@@ -34,7 +34,7 @@ A modern **Windows 11** desktop app (**WinUI 3 / .NET 9**) that runs natively on
 
 | Family | Files | Head | Output | Postprocess |
 |---|---|---|---|---|
-| YOLOv4 (legacy) | `yolov4.onnx` (~257 MB, included) | anchor-based, 3-grid | `[1, gY, gX, 3, 5+nc]` × 3 | sigmoid + exp anchor decode + class-grouped NMS |
+| YOLOv4 (legacy) | `yolov4.onnx` (~257 MB, not redistributed — see below) | anchor-based, 3-grid | `[1, gY, gX, 3, 5+nc]` × 3 | sigmoid + exp anchor decode + class-grouped NMS |
 | Ultralytics YOLO26 | `yolo26{n,s,m,l}.onnx` | end-to-end (one-to-one) NMS-free | `[1, 300, 6]` | confidence filter + letterbox-undo |
 | Ultralytics YOLO26 | `yolo26{n,s,m,l}-o2m.onnx` | one-to-many | `[1, 4+nc, 8400]` | argmax + class-grouped NMS |
 | RF-DETR | `rfdetr*.onnx` | DETR-style set prediction | normalized boxes | sigmoid scores + direct coord map |
@@ -287,7 +287,7 @@ Models/
   Location.cs              # Bookshelf location model
   Scan.cs                  # Scan session model
   CocoLabels.cs            # 80 COCO classes
-  yolov4.onnx              # Bundled legacy model
+  yolov4.onnx              # Legacy model (not redistributed; gitignored)
   yolo26*.onnx             # Downloaded by scripts\download-models.ps1
 
 Pages/
@@ -336,8 +336,32 @@ scripts/
 
 ---
 
-## License notes
+## License
 
-- The original sample code in this repo is provided under the AI Dev Gallery license.
-- **Ultralytics YOLO26** weights and any models you derive from them are **AGPL-3.0**. An [enterprise license](https://www.ultralytics.com/license) is required for closed-source commercial distribution.
+This project is licensed under the **MIT License** — see [`LICENSE`](LICENSE).
+
+- The project began as a fork of Microsoft's **AI Dev Gallery** sample (MIT,
+  © Microsoft Corporation); that original copyright notice is retained in `LICENSE`.
+- **No ONNX model weights are redistributed in this repo.** `yolov4.onnx` and the
+  YOLO26 weights are gitignored and fetched/exported by the user.
+- **Ultralytics YOLO26** weights and any models you derive from them are **AGPL-3.0**.
+  An [Ultralytics Enterprise License](https://www.ultralytics.com/license) is required
+  for closed-source commercial distribution. This obligation is on whoever downloads
+  and uses those weights — it does not apply to this MIT-licensed source.
 - COCO labels come from the COCO 2017 dataset (Common Objects in Context).
+
+## Privacy / data flow
+
+Configure your own Azure OpenAI resource and (optionally) a Google Books API key —
+no keys are bundled. At runtime the app sends data to third-party services **only for
+features you invoke**:
+
+- **Azure OpenAI** (your configured endpoint) — receives bookshelf images for AI
+  Analyze / Extract Titles and book titles for description generation.
+- **Google Books, Wikipedia, Open Library** — receive book titles/authors to fetch
+  metadata, descriptions, and cover images.
+
+Object detection, OCR (`TextRecognizer`), dictation (Whisper.net), and library search
+(Windows AI App Content Search) all run **on-device**. API keys are stored
+DPAPI-encrypted under `%LOCALAPPDATA%\BiblioText\` and never leave the machine except
+as request authentication to the services above.

@@ -3,17 +3,17 @@
 ## Workflow (single-user dev, no team)
 
 This is a one-developer project. The user runs the app from **Visual Studio**, with the
-solution open at `C:\Users\guyanderson\source\velvet\YOLO_Object_DetectionSample`.
+solution open at the primary checkout (referred to below as the "main checkout").
 Sessions usually live in a different worktree (`copilot-worktrees\...`). Two rules
 follow from that:
 
 - **Don't propose worktree branching strategies, stacked PRs, or "let's keep this
   isolated."** Single user, single branch flow. Commit on whatever branch the
   session is on and push.
-- **Always sync velvet after pushing.** When you commit & push from the worktree,
-  immediately run in the velvet checkout (no need to ask first):
+- **Always sync the main checkout after pushing.** When you commit & push from the worktree,
+  immediately run in the main checkout (no need to ask first):
   ```powershell
-  Push-Location C:\Users\guyanderson\source\velvet\YOLO_Object_DetectionSample
+  Push-Location <path-to-main-checkout>
   git fetch origin
   git reset --hard origin/<current-branch>
   Pop-Location
