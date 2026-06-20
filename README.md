@@ -115,7 +115,7 @@ The app uses a **NavigationView** shell with four pages:
 - **EXTRACT TITLES** — crops each detection and sends to AI for title/author extraction.
 - **AI ANALYZE** — sends the full annotated image (with numbered bounding boxes) to Azure OpenAI GPT-5.4 vision. The AI references detections by their numbered labels.
 - **Numbered bounding boxes** — each detection gets a 1-based numerical ID badge drawn on the image.
-- **Draw box** — manually add a missed spine: toggle the draw button and drag a box, or hold the Surface Slim Pen barrel button and drag (release the barrel to commit). The pen's eraser end deletes a box; clicking a box toggles it in/out of the selection.
+- **Draw / pen / eraser** — manually add or delete bounding boxes with the mouse or a Surface Slim Pen before extraction (see [Drawing & pen input](#drawing--pen-input-scan-page)).
 - **Status chip** — an acrylic overlay on the viewer shows the live detection count, selected count, and inference timings (pre / infer / post / total ms).
 
 ### Review Page
@@ -129,7 +129,7 @@ The app uses a **NavigationView** shell with four pages:
 
 ### Library Page
 - Browse saved books with spine thumbnails and detection index badges.
-- **Search box** — filter by title, author, or description.
+- **Search box** — semantic search over title / author / description via the Windows on-device content index, with an automatic substring (`LIKE`) fallback when the index is unavailable or returns no hits (see [Semantic search & indexing](#semantic-search--indexing)).
 - **Location filter** and **sort** (title / author / newest / oldest).
 - **Status filter** — All / Duplicates / Missing Descriptions.
 - **Duplicate** badge for entries whose normalized title+author matches an existing book.
@@ -149,6 +149,32 @@ The app uses a **NavigationView** shell with four pages:
 - Left-click + drag pans when zoomed in.
 - Double-click resets to 1×.
 - EXIF orientation is normalized at load time.
+
+### Drawing & pen input (Scan page)
+
+Manual boxes let you recover spines the detector missed — or delete false positives — before extraction. Three input paths feed the same draw pipeline:
+
+| Action | Mouse / touch | Surface Slim Pen |
+|---|---|---|
+| Start a box | Toggle the **Draw box** button, then drag on the image | Press-and-hold the **barrel button** and drag (no toggle needed) |
+| Commit the box | Release the drag | Release the **barrel button** (lifting only the tip keeps the draw alive) |
+| Cancel the box | Untoggle Draw box, or draw a box smaller than 8×8 px | Lift the pen out of range (cancels the in-progress draw) |
+| Toggle a box in/out of the selection | Click it | Tap it with the tip |
+| Delete a box outright | — | Flip to the **eraser** end and touch the box |
+
+Implementation notes:
+- The Slim Pen's barrel button does **not** reliably raise `PointerPressed` while the pen is hovering, so draws are driven off the **rising/falling edge of `IsBarrelButtonPressed`** in `PointerMoved`. A `DrawSource` enum (`None` / `Toggle` / `PenBarrel`) records who started the draw so commit and cancel behave correctly for each source.
+- Toggle-draw is **one-shot** — the Draw box button auto-unchecks after each committed or cancelled box. A pen-barrel draw deliberately survives the user toggling that button.
+- A committed box becomes a `Prediction { IsManual = true, Confidence = 1.0 }` and participates in Extract / AI Analyze exactly like a detected box.
+- Boxes smaller than 8×8 px are discarded, so a stray click or tap never creates an invisible prediction.
+
+### Semantic search & indexing
+
+The Library search box is backed by `SemanticSearchService`, which wraps the Windows on-device content index (`Microsoft.Windows.Search.AppContentIndex`):
+
+- **Indexing** — each book's `title + author + long description` is added to the index when it is saved. At startup, `ReindexAllAsync` sweeps the whole library (idempotent `AddOrUpdate`) so books saved before the indexer existed — or whose initial index call failed transiently — still become searchable.
+- **Searching** — queries page the index 200 IDs at a time up to a cap, then intersect with the current location filter.
+- **Graceful fallback** — if the content-index capability is unavailable, or a query returns no semantic hits, the Library silently falls back to a repository substring (`LIKE`) query. Every index operation is a no-op when the service is unavailable, so search is never a hard dependency.
 
 ---
 
@@ -184,7 +210,8 @@ scripts/          Model download automation
 - **SQLite persistence** — auto-migrates schema with `ALTER TABLE ADD COLUMN` for new fields, serializes access through a `SemaphoreSlim` gate, indexes hot columns, and uses batch transactions for review saves.
 - **AI resilience** — `AzureOpenAiHttp` centralizes bounded timeouts, transient retry/backoff (408/429/5xx), and response-shape validation before parsing model content. All AI services share it.
 - **Reentrancy guards** — Send-to-Library, Extract, and AI-Analyze all use `_isSaving` / `Interlocked.Exchange` busy flags so rapid clicks don't trigger overlapping work.
-- **Editable prompts** — All three prompts (`SpineExtraction`, `BookshelfAnalysis`, `BookDescription`) can be customized in Settings and fall back to the defaults in `DefaultPrompts`.
+- **Editable, versioned prompts** — The spine extraction, bookshelf analysis (system + user), and book description prompts can be customized in Settings and otherwise fall back to `DefaultPrompts`. A `PromptsVersion` stamp auto-migrates saved overrides: when `DefaultPrompts.CurrentVersion` is bumped, stale saved prompts are cleared so the new in-source defaults take effect.
+- **Semantic library search** — `SemanticSearchService` wraps the Windows `AppContentIndex`. Books are indexed on save and swept with `ReindexAllAsync` at startup (idempotent `AddOrUpdate`) so pre-existing libraries become searchable. Search pages results in 200-ID batches and silently falls back to a repository `LIKE` query when the index is unavailable or returns nothing — every index op is a graceful no-op, never a hard dependency.
 - **On-device speech and OCR** — Whisper.net for dictation and the Windows AI `TextRecognizer` for OCR avoid network calls for those features.
 
 ---
@@ -198,8 +225,14 @@ On first launch, go to **Settings** and configure:
 | Azure OpenAI Endpoint | e.g. `https://your-resource.openai.azure.com/` |
 | API Key | Your Azure OpenAI resource key |
 | Deployment Name | The GPT-5.4 (or compatible vision model) deployment name |
+| API Version | Azure OpenAI API version (default `2024-10-21`) |
+| Google Books API Key | Optional; enables the Google Books metadata provider (free key from Google Cloud Console) |
 
 Settings are encrypted at rest using DPAPI and stored in the app's local data folder.
+
+If no value is saved in Settings, the app falls back to environment variables:
+`AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_DEPLOYMENT`,
+`AZURE_OPENAI_API_VERSION`, and `GOOGLE_BOOKS_API_KEY`.
 
 ---
 
@@ -214,7 +247,11 @@ Settings are encrypted at rest using DPAPI and stored in the app's local data fo
 | **Review** | Accept/reject books, edit title/author, set location, click crop thumbnail → overlay |
 | **Review overlay** | Tap overlay → closes; zoom in overlay → pinch/scroll works |
 | **Library** | Save from Review → books appear with spine images and detection badges |
+| **Library search** | Type a query → results filter (semantic when available, substring fallback otherwise) |
 | **Library edit** | Ellipsis → edit title/author → changes persist |
+| **Draw box** | Toggle Draw box → drag → manual box added and Extract-able |
+| **Pen draw** | Hold Slim Pen barrel + drag → release barrel → box commits |
+| **Pen eraser** | Touch a box with the pen eraser → box deleted |
 | **Settings** | Set Azure endpoint + key + deployment → values persist across restart |
 | **Navigation** | Switch between pages → state preserved (NavigationCacheMode) |
 | **Models** | Switch model in picker → re-detects with new model |
@@ -249,7 +286,7 @@ Services/
   AzureOpenAiAnalysisClient.cs    # GPT-5.4 vision API for full-image analysis
   AzureOpenAiTitleExtractor.cs    # Per-crop title extraction
   BookDescriptionService.cs       # Grounded short/long descriptions from the union of provider snippets
-  BookMetadataLookupService.cs    # IBookMetadataLookupService + Open Library provider
+  BookMetadataLookupService.cs    # IBookMetadataLookupService + OpenLibraryBookMetadataLookupService provider
   GoogleBooksMetadataLookupService.cs  # Google Books provider (requires API key)
   WikipediaMetadataLookupService.cs    # Wikipedia provider (no key; relevance search)
   CompositeMetadataLookupService.cs    # Runs all providers in parallel, aggregates the union, sorts by match score
@@ -265,9 +302,11 @@ Persistence/
   SqliteLibraryRepository.cs     # SQLite CRUD with auto-migration
 
 Settings/
-  AppSettings.cs                 # App configuration model
+  ISettingsStore.cs              # Settings store abstraction
+  AppSettings.cs                 # App configuration model (incl. PromptsVersion stamp)
   DpapiSettingsStore.cs          # DPAPI-encrypted settings storage
-  CompositeSettingsStore.cs      # Cascading settings (DPAPI → environment)
+  EnvironmentSettingsStore.cs    # Environment-variable fallback store
+  CompositeSettingsStore.cs      # Cascading settings (DPAPI → environment) + prompt-version migration
 
 Utils/
   BitmapFunctions.cs       # Resize, letterbox, NCHW/NHWC, render boxes with ID badges
