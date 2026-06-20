@@ -13,7 +13,7 @@ A modern **Windows 11** desktop app (**WinUI 3 / .NET 9**) that runs natively on
 <img width="2490" height="1590" alt="image" src="https://github.com/user-attachments/assets/392048d1-7c79-45eb-88af-a8ff8c2dcaaa" />
 <img width="2494" height="1588" alt="image" src="https://github.com/user-attachments/assets/4f8ff741-82af-487d-8fe8-1b8b1359f824" />
 <img width="2494" height="1590" alt="image" src="https://github.com/user-attachments/assets/a280c476-f5f2-4dde-8a20-485f27d4262b" />
-<img width="1247" height="794" alt="image" src="https://github.com/user-attachments/assets/f06b489d-cb8d-40d3-abb7-b03447c39151" />
+<img width="1247" height="797" alt="image" src="https://github.com/user-attachments/assets/a495fa50-200a-4c09-bc12-2d8935a9e048" />
 
 
 ## Features
