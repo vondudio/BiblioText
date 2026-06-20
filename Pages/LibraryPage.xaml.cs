@@ -346,8 +346,13 @@ public sealed partial class LibraryPage : Page
             return;
         }
 
-        double containerW = BookshelfOverlayImage.ActualWidth;
-        double containerH = BookshelfOverlayImage.ActualHeight;
+        // The Canvas fills the whole overlay cell, but the Image (Stretch=Uniform)
+        // shrinks its element to the scaled content and is centered in the cell. So we
+        // must letterbox against the CANVAS (cell) size and add the centering offset —
+        // using the Image's ActualWidth here would drop the horizontal offset and shift
+        // the box to the left.
+        double containerW = BookshelfBoxCanvas.ActualWidth;
+        double containerH = BookshelfBoxCanvas.ActualHeight;
         if (containerW <= 0 || containerH <= 0)
         {
             DetectionBox.Visibility = Visibility.Collapsed;

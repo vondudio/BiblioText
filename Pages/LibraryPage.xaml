@@ -321,7 +321,8 @@
                                 AutomationProperties.Name="Bookshelf scan image" />
                             <Canvas
                                 x:Name="BookshelfBoxCanvas"
-                                IsHitTestVisible="False">
+                                IsHitTestVisible="False"
+                                SizeChanged="BookshelfOverlayImage_SizeChanged">
                                 <Rectangle
                                     x:Name="DetectionBox"
                                     Stroke="#FF3B30"
