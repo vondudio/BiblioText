@@ -10,6 +10,10 @@ A modern **Windows 11** desktop app (**WinUI 3 / .NET 9**) that runs natively on
 - **Front & rear camera capture** — capture a shelf in-app with a selectable front/rear camera and live preview.
 - **Hand-editable detections** — add missed spines, delete false positives, and toggle which boxes count before extraction.
 
+<img width="1247" height="795" alt="image" src="https://github.com/user-attachments/assets/3fb7068e-d8d4-4cdb-a6c8-5f7ab636cb92" />
+<img width="2494" height="1588" alt="image" src="https://github.com/user-attachments/assets/4f8ff741-82af-487d-8fe8-1b8b1359f824" />
+<img width="2494" height="1590" alt="image" src="https://github.com/user-attachments/assets/a280c476-f5f2-4dde-8a20-485f27d4262b" />
+
 ## Features
 
 - **Scan** — Load bookshelf photos (file picker, drag-and-drop, or live camera capture) and run object detection (YOLOv4, YOLO26, or RF-DETR) to identify individual book spines with numbered bounding boxes.
