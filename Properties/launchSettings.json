@@ -1,9 +1,9 @@
 {
   "profiles": {
-    "YOLO Object DetectionSample (Package)": {
+    "BiblioText (Package)": {
       "commandName": "MsixPackage"
     },
-    "YOLO Object DetectionSample (Unpackaged)": {
+    "BiblioText (Unpackaged)": {
       "commandName": "Project"
     }
   }
