@@ -64,9 +64,9 @@ The `Models\ModelInfo.cs` registry only lists models whose `.onnx` is actually p
 
 ### From the command line
 ```pwsh
-dotnet restore .\BiblioText.csproj
-dotnet build   .\BiblioText.csproj -c Debug   -p:Platform=ARM64
-dotnet build   .\BiblioText.csproj -c Release -p:Platform=ARM64
+dotnet restore .\station\BiblioText.csproj
+dotnet build   .\station\BiblioText.csproj -c Debug   -p:Platform=ARM64
+dotnet build   .\station\BiblioText.csproj -c Release -p:Platform=ARM64
 ```
 Use `-p:Platform=x64` on Intel/AMD devices.
 
@@ -78,11 +78,11 @@ The YOLO26 weights are licensed **AGPL-3.0** by Ultralytics and are not redistri
 
 ### Default — direct download (recommended)
 ```pwsh
-.\scripts\download-models.ps1                       # n + s + m detection
-.\scripts\download-models.ps1 -Sizes n,m            # just two sizes
-.\scripts\download-models.ps1 -Sizes n,s,m,l        # also the large detection model
-.\scripts\download-models.ps1 -Tasks seg            # segmentation variants (n + s + m)
-.\scripts\download-models.ps1 -Tasks detect,seg     # everything
+.\station\scripts\download-models.ps1                       # n + s + m detection
+.\station\scripts\download-models.ps1 -Sizes n,m            # just two sizes
+.\station\scripts\download-models.ps1 -Sizes n,s,m,l        # also the large detection model
+.\station\scripts\download-models.ps1 -Tasks seg            # segmentation variants (n + s + m)
+.\station\scripts\download-models.ps1 -Tasks detect,seg     # everything
 ```
 Pulls pre-exported ONNX from the community Hugging Face mirror at
 `https://huggingface.co/zwh20081/yolo26-onnx`. Detection files are the Ultralytics
@@ -97,8 +97,8 @@ byte-for-byte reproducibility.
 If you need the one-to-many head (`*-o2m.onnx`), a custom `opset`, or you don't want
 to trust the community mirror:
 ```pwsh
-.\scripts\download-models.ps1 -UseUltralytics                 # n + s + m, both heads
-.\scripts\download-models.ps1 -UseUltralytics -Sizes n,m
+.\station\scripts\download-models.ps1 -UseUltralytics                 # n + s + m, both heads
+.\station\scripts\download-models.ps1 -UseUltralytics -Sizes n,m
 ```
 Requires **Python 3.11+** on `PATH`. Creates an isolated venv at
 `%LOCALAPPDATA%\BiblioText\venv`, installs `ultralytics`, then runs
@@ -211,6 +211,19 @@ Persistence/      SQLite repository (ILibraryRepository, SqliteLibraryRepository
 Settings/         Encrypted settings storage (DPAPI + environment variable fallback)
 Utils/            Image processing (BitmapFunctions, YOLOHelpers, Letterbox)
 scripts/          Model download automation
+```
+
+The repo is a monorepo. The desktop capture station lives under `station/`
+(all of the folders above are `station/Models`, `station/Services`, …), with a
+shared `contracts/` library alongside it for the (in-progress) station→cloud
+publish payload:
+
+```
+/ (repo root)
+├─ BiblioText.sln        Solution (open this in Visual Studio)
+├─ station/              WinUI 3 / .NET 9 ARM64 desktop capture station
+├─ contracts/            Shared publish-payload DTOs (BiblioText.Contracts)
+└─ README.md
 ```
 
 ### Key Design Decisions

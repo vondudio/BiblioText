@@ -3,7 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.12.35707.178 d17.12
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BiblioText", "BiblioText.csproj", "{33f7959f-4c99-48bb-8290-4b4210852bf6}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BiblioText", "station\BiblioText.csproj", "{33f7959f-4c99-48bb-8290-4b4210852bf6}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BiblioText.Contracts", "contracts\BiblioText.Contracts.csproj", "{5F632047-9B4B-4C7F-B6C0-3E161D6AD47D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -25,6 +27,14 @@ Global
 		{33f7959f-4c99-48bb-8290-4b4210852bf6}.Release|x64.ActiveCfg = Release|x64
 		{33f7959f-4c99-48bb-8290-4b4210852bf6}.Release|x64.Build.0 = Release|x64
 		{33f7959f-4c99-48bb-8290-4b4210852bf6}.Release|x64.Deploy.0 = Release|x64
+		{5F632047-9B4B-4C7F-B6C0-3E161D6AD47D}.Debug|ARM64.ActiveCfg = Debug|Any CPU
+		{5F632047-9B4B-4C7F-B6C0-3E161D6AD47D}.Debug|ARM64.Build.0 = Debug|Any CPU
+		{5F632047-9B4B-4C7F-B6C0-3E161D6AD47D}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{5F632047-9B4B-4C7F-B6C0-3E161D6AD47D}.Debug|x64.Build.0 = Debug|Any CPU
+		{5F632047-9B4B-4C7F-B6C0-3E161D6AD47D}.Release|ARM64.ActiveCfg = Release|Any CPU
+		{5F632047-9B4B-4C7F-B6C0-3E161D6AD47D}.Release|ARM64.Build.0 = Release|Any CPU
+		{5F632047-9B4B-4C7F-B6C0-3E161D6AD47D}.Release|x64.ActiveCfg = Release|Any CPU
+		{5F632047-9B4B-4C7F-B6C0-3E161D6AD47D}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

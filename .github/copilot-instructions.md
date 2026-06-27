@@ -23,12 +23,16 @@ follow from that:
 
 ## Build & Run
 
-- **Build**: `dotnet build BiblioText.csproj -c Debug -p:Platform=ARM64 --nologo -v:m`
+- **Build**: `dotnet build station\BiblioText.csproj -c Debug -p:Platform=ARM64 --nologo -v:m`
+  (or build the whole solution: `dotnet build BiblioText.sln -c Debug -p:Platform=ARM64`).
 - **Platform**: ARM64 WinUI 3 / .NET 9 desktop app. Always use `-p:Platform=ARM64` —
   the project will not load on x64/AnyCPU.
 - **Run**: User launches from Visual Studio (F5). `dotnet run` works but is rarely
   the right answer — the user wants to debug in VS.
-- Project file: `BiblioText.csproj` (renamed from the original sample).
+- **Monorepo layout**: the desktop capture station lives under `station/`
+  (`station\BiblioText.csproj`); the shared station→cloud publish DTOs live in
+  `contracts\BiblioText.Contracts.csproj`. `BiblioText.sln` at the repo root
+  references both. The csproj was renamed from the original sample.
 
 
 ## Architecture
