@@ -38,6 +38,7 @@ public partial class App : Application
             sp.GetRequiredService<OpenLibraryBookMetadataLookupService>()));
         services.AddSingleton<BookDescriptionService>();
         services.AddSingleton<SemanticSearchService>();
+        services.AddSingleton<BackgroundDescriptionService>();
         Services = services.BuildServiceProvider();
 
         SettingsStore = Services.GetRequiredService<ISettingsStore>();
@@ -53,6 +54,8 @@ public partial class App : Application
         var searchService = Services.GetRequiredService<SemanticSearchService>();
         await searchService.InitializeAsync();
         SemanticSearchService = searchService;
+
+        BackgroundDescriptions = Services.GetRequiredService<BackgroundDescriptionService>();
 
         // Background backfill: re-add every existing book to the semantic
         // index. Catches books saved before the indexer was wired up (or
@@ -85,4 +88,5 @@ public partial class App : Application
     internal static AzureOpenAiAnalysisClient? AnalysisClient { get; private set; }
     internal static ScanWorkflowService? WorkflowService { get; private set; }
     internal static SemanticSearchService? SemanticSearchService { get; private set; }
+    internal static BackgroundDescriptionService? BackgroundDescriptions { get; private set; }
 }

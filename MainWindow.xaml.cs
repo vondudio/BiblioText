@@ -27,6 +27,34 @@ public sealed partial class MainWindow : Window
             // Select the Scan tab by default
             NavView.SelectedItem = NavView.MenuItems[0];
         };
+
+        HookPendingDescriptionsIndicator();
+    }
+
+    private void HookPendingDescriptionsIndicator()
+    {
+        var svc = App.BackgroundDescriptions;
+        if (svc == null) return;
+
+        svc.PendingChanged += (s, e) =>
+        {
+            int n = App.BackgroundDescriptions?.PendingCount ?? 0;
+            DispatcherQueue.TryEnqueue(() => UpdatePendingBadge(n));
+        };
+        UpdatePendingBadge(svc.PendingCount);
+    }
+
+    private void UpdatePendingBadge(int pending)
+    {
+        if (pending > 0)
+        {
+            ReviewPendingBadge.Value = pending;
+            ReviewPendingBadge.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            ReviewPendingBadge.Visibility = Visibility.Collapsed;
+        }
     }
 
     private void NavView_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)

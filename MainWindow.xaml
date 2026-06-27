@@ -30,6 +30,14 @@
                     <NavigationViewItem.Icon>
                         <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE70B;" />
                     </NavigationViewItem.Icon>
+                    <NavigationViewItem.InfoBadge>
+                        <InfoBadge
+                            x:Name="ReviewPendingBadge"
+                            Value="0"
+                            Visibility="Collapsed"
+                            ToolTipService.ToolTip="Book descriptions generating in the background"
+                            AutomationProperties.Name="Descriptions pending" />
+                    </NavigationViewItem.InfoBadge>
                 </NavigationViewItem>
                 <NavigationViewItem Content="Library" Tag="library" AutomationProperties.Name="Library">
                     <NavigationViewItem.Icon>

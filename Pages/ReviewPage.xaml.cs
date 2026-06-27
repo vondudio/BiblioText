@@ -341,11 +341,11 @@ public sealed partial class ReviewPage : Page
                 _candidates.Remove(candidate);
             }
 
-            // Fire off AI description generation in the background so the user
-            // can immediately queue more "Send to Library" batches. Each batch
-            // gets its own job; they finish and update the DB + index
-            // independently. The save itself (above) is already complete.
-            _ = RunDescriptionJobAsync(result.SavedBooks, repo);
+            // Hand description generation to the app-wide background queue so it
+            // survives navigation away from Review and the nav-rail badge can
+            // show how many are still pending. The save above is already done.
+            App.BackgroundDescriptions?.Enqueue(result.SavedBooks);
+            ReviewStatusText.Text = $"Queued {result.SavedBooks.Count} book(s) for descriptions — generating in the background.";
 
             // Remove this scan set if all candidates are processed
             if (_candidates.Count == 0 && _currentScanIndex >= 0 && _currentScanIndex < _scanQueue.Count)
@@ -382,113 +382,6 @@ public sealed partial class ReviewPage : Page
 
     private static string StringOr(string? a, string? b) => string.IsNullOrWhiteSpace(a) ? (b ?? "") : a;
 
-    // Number of background description jobs currently running and the total
-    // books they cover. Mutated only on the UI thread (WinUI marshals async
-    // continuations back to the dispatcher), so no locking is needed.
-    private int _descJobsInFlight;
-    private int _descBooksInFlight;
-
-    /// <summary>
-    /// Background wrapper around description generation. Tracks in-flight work
-    /// so the slim status bar can reflect overall progress while the user keeps
-    /// sending more batches. Never throws — failures are surfaced as status.
-    /// </summary>
-    private async Task RunDescriptionJobAsync(List<Book> books, Persistence.ILibraryRepository repo)
-    {
-        if (books.Count == 0) return;
-
-        _descJobsInFlight++;
-        _descBooksInFlight += books.Count;
-        UpdateDescriptionStatus(null);
-
-        string? note = null;
-        try
-        {
-            note = await FetchAndStoreDescriptionsAsync(books, repo);
-        }
-        catch (Exception ex)
-        {
-            note = ex.Message;
-        }
-        finally
-        {
-            _descJobsInFlight--;
-            _descBooksInFlight -= books.Count;
-            UpdateDescriptionStatus(note);
-        }
-    }
-
-    private void UpdateDescriptionStatus(string? lastNote)
-    {
-        if (_descJobsInFlight > 0)
-        {
-            ReviewStatusText.Text =
-                $"Generating descriptions for {_descBooksInFlight} book(s) in the background — you can keep sending more.";
-        }
-        else
-        {
-            ReviewStatusText.Text = string.IsNullOrWhiteSpace(lastNote)
-                ? "✓ Descriptions updated in the background."
-                : $"Descriptions finished — {lastNote}";
-        }
-    }
-
-    /// <summary>
-    /// Fetches AI descriptions for the supplied books and writes them to the DB
-    /// and semantic index. Returns null on full success, or a short note
-    /// describing why descriptions were skipped/partial. Does not touch UI
-    /// status itself (the background wrapper owns that).
-    /// </summary>
-    private async Task<string?> FetchAndStoreDescriptionsAsync(List<Book> books, Persistence.ILibraryRepository repo)
-    {
-        var settingsStore = App.SettingsStore;
-        if (settingsStore == null) return "settings unavailable";
-
-        var settings = settingsStore.Load();
-        if (!settings.IsConfigured)
-        {
-            return "Azure OpenAI not configured";
-        }
-
-        var descService = (App.Services?.GetService(typeof(BookDescriptionService)) as BookDescriptionService)
-                          ?? new BookDescriptionService(settingsStore);
-        var bookList = books.Select(b => (b.Id, b.Title, b.Author)).ToList();
-        var descriptionResult = await descService.GetDescriptionsResultAsync(bookList);
-        if (!descriptionResult.IsSuccess)
-        {
-            return descriptionResult.ErrorMessage ?? "description service error";
-        }
-
-        var descriptions = descriptionResult.Descriptions;
-        if (descriptions.Count == 0)
-        {
-            return "no descriptions returned";
-        }
-
-        foreach (var desc in descriptions)
-        {
-            var book = books.FirstOrDefault(b => b.Id == desc.BookId);
-            if (book != null)
-            {
-                book.ShortDescription = desc.ShortDescription;
-                book.LongDescription = desc.LongDescription;
-                book.IsDescriptionGrounded = desc.IsGrounded;
-                book.DescriptionSourcesJson = desc.SourcesJson;
-                book.DescriptionGeneratedAt = desc.GeneratedAt;
-                await repo.UpdateBookAsync(book);
-
-                var searchService = App.SemanticSearchService;
-                if (searchService != null)
-                {
-                    await searchService.IndexBookAsync(book.Id, book.Title, book.Author, book.LongDescription);
-                }
-            }
-        }
-
-        return descriptions.Count == books.Count
-            ? null
-            : $"{descriptions.Count} of {books.Count} described";
-    }
 
     private DictationService? _dictation;
     private Button? _activeRecordButton;
