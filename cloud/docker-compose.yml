@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: bibliotext-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: bibliotext
+    ports:
+      - "5432:5432"
+    volumes:
+      - bibliotext-pgdata:/var/lib/postgresql/data
+
+volumes:
+  bibliotext-pgdata:
