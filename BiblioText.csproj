@@ -18,8 +18,23 @@
     <AssemblyVersion>0.2.0.0</AssemblyVersion>
     <FileVersion>0.2.0.0</FileVersion>
   </PropertyGroup>
+  <!--
+    The desktop SDK project globs **/*.cs from the repo root. Exclude the
+    monorepo's non-desktop trees (shared contract + future cloud app) so their
+    sources and generated AssemblyInfo don't get swept into this assembly.
+    (Until Phase 0 moves the desktop app under station/, these live as siblings.)
+  -->
   <ItemGroup>
-    <Content Include="Assets\SplashScreen.scale-200.png" />
+    <Compile Remove="contracts\**\*.cs" />
+    <Compile Remove="cloud\**\*.cs" />
+    <EmbeddedResource Remove="contracts\**" />
+    <EmbeddedResource Remove="cloud\**" />
+    <None Remove="contracts\**" />
+    <None Remove="cloud\**" />
+    <Page Remove="contracts\**" />
+    <Page Remove="cloud\**" />
+  </ItemGroup>
+  <ItemGroup>
     <Content Include="Assets\LockScreenLogo.scale-200.png" />
     <Content Include="Assets\Square150x150Logo.scale-200.png" />
     <Content Include="Assets\Square44x44Logo.scale-200.png" />

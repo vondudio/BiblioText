@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Shared publish-payload contract between the desktop capture station and the
+    Azure cloud (publish API + website). Targets plain net9.0 so it can be
+    referenced by BOTH the WinUI desktop app (net9.0-windows) and an ASP.NET
+    Core cloud app. Pure DTOs / constants only — no platform dependencies.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <RootNamespace>BiblioText.Contracts</RootNamespace>
+    <AssemblyName>BiblioText.Contracts</AssemblyName>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>preview</LangVersion>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+
+</Project>
