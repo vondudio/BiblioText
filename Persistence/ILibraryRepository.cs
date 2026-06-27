@@ -19,6 +19,7 @@ public interface ILibraryRepository
     Task UpdateBookAsync(Book book);
     Task DeleteBookAsync(int bookId);
     Task ResetLibraryAsync();
+    Task RecomputeDuplicateFlagsAsync();
     Task<List<Book>> GetBooksAsync(string? searchQuery = null, int? locationId = null);
     Task<Book?> GetBookByIdAsync(int id);
 

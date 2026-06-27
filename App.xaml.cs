@@ -66,6 +66,10 @@ public partial class App : Application
         {
             try
             {
+                // Heal any stale duplicate flags left by earlier saves/deletes,
+                // then make sure the semantic index covers every book.
+                await repo.RecomputeDuplicateFlagsAsync();
+
                 var all = await repo.GetBooksAsync();
                 await searchService.ReindexAllAsync(
                     all.Select(b => (b.Id, b.Title, b.Author, b.LongDescription)));

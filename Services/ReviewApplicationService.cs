@@ -36,7 +36,7 @@ internal sealed class ReviewApplicationService : IReviewApplicationService
         CancellationToken ct = default)
     {
         var existingBookKeys = (await _repository.GetBooksAsync())
-            .Select(b => NormalizeBookKey(b.Title, b.Author))
+            .Select(b => BookKey.Normalize(b.Title, b.Author))
             .Where(key => key.Length > 0)
             .ToHashSet(StringComparer.Ordinal);
 
@@ -58,7 +58,7 @@ internal sealed class ReviewApplicationService : IReviewApplicationService
                 CreatedAt = DateTime.UtcNow
             };
 
-            book.IsDuplicate = existingBookKeys.Contains(NormalizeBookKey(book.Title, book.Author));
+            book.IsDuplicate = existingBookKeys.Contains(BookKey.Normalize(book.Title, book.Author));
             if (book.IsDuplicate)
             {
                 duplicateCount++;
@@ -130,32 +130,6 @@ internal sealed class ReviewApplicationService : IReviewApplicationService
         return string.Create(
             System.Globalization.CultureInfo.InvariantCulture,
             $"{x:0.#####},{y:0.#####},{w:0.#####},{h:0.#####}");
-    }
-
-    private static string NormalizeBookKey(string title, string? author)
-    {
-        static string NormalizePart(string? value)
-        {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                return string.Empty;
-            }
-
-            var chars = value
-                .Trim()
-                .ToLowerInvariant()
-                .Where(char.IsLetterOrDigit)
-                .ToArray();
-            return new string(chars);
-        }
-
-        var normalizedTitle = NormalizePart(title);
-        if (normalizedTitle.Length == 0)
-        {
-            return string.Empty;
-        }
-
-        return $"{normalizedTitle}|{NormalizePart(author)}";
     }
 }
 

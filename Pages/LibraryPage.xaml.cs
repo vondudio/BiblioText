@@ -680,6 +680,10 @@ public sealed partial class LibraryPage : Page
             await repo.DeleteBookAsync(book.Id);
         }
 
+        // Deleting can reduce a duplicate group to a single title; re-derive the
+        // duplicate flags so the survivor is no longer marked as a duplicate.
+        await repo.RecomputeDuplicateFlagsAsync();
+
         await RefreshAsync();
     }
 

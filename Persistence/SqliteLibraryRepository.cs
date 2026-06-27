@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using BiblioText.Models;
@@ -437,6 +438,72 @@ public sealed class SqliteLibraryRepository : ILibraryRepository, IDisposable
                 INSERT INTO books_fts(books_fts) VALUES('rebuild');
                 """;
             await cmd.ExecuteNonQueryAsync();
+        }
+        finally
+        {
+            _dbGate.Release();
+        }
+    }
+
+    /// <summary>
+    /// Recomputes the <c>is_duplicate</c> flag for every book so that it is
+    /// always derived from the current catalog: a title with only one instance
+    /// is never a duplicate, and within a group of matching titles the earliest
+    /// (lowest id) is the kept "primary" while the rest are flagged. Persists
+    /// only the rows whose flag actually changed. Self-healing — safe to call
+    /// after deletes or at startup.
+    /// </summary>
+    public async Task RecomputeDuplicateFlagsAsync()
+    {
+        await _dbGate.WaitAsync();
+        try
+        {
+            EnsureConnected();
+
+            var rows = new List<(int Id, string Title, string? Author, bool IsDup)>();
+            using (var read = _connection!.CreateCommand())
+            {
+                read.CommandText = "SELECT id, title, author, is_duplicate FROM books;";
+                using var reader = await read.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    rows.Add((
+                        reader.GetInt32(0),
+                        reader.IsDBNull(1) ? "" : reader.GetString(1),
+                        reader.IsDBNull(2) ? null : reader.GetString(2),
+                        reader.GetInt32(3) != 0));
+                }
+            }
+
+            // Desired flag per book id.
+            var desired = new Dictionary<int, bool>(rows.Count);
+            foreach (var group in rows.GroupBy(r => BookKey.Normalize(r.Title, r.Author)))
+            {
+                if (group.Key.Length == 0)
+                {
+                    // No usable key (e.g. blank title) — never treat as a duplicate.
+                    foreach (var r in group) desired[r.Id] = false;
+                    continue;
+                }
+
+                var ordered = group.OrderBy(r => r.Id).ToList();
+                for (int i = 0; i < ordered.Count; i++)
+                {
+                    desired[ordered[i].Id] = i > 0; // first = primary, rest = duplicate
+                }
+            }
+
+            foreach (var r in rows)
+            {
+                if (desired.TryGetValue(r.Id, out var want) && want != r.IsDup)
+                {
+                    using var upd = _connection!.CreateCommand();
+                    upd.CommandText = "UPDATE books SET is_duplicate=@d WHERE id=@id;";
+                    upd.Parameters.AddWithValue("@d", want ? 1 : 0);
+                    upd.Parameters.AddWithValue("@id", r.Id);
+                    await upd.ExecuteNonQueryAsync();
+                }
+            }
         }
         finally
         {
