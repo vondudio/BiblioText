@@ -10,11 +10,15 @@ public interface ILibraryRepository
 {
     Task InitializeAsync();
 
+    /// <summary>Absolute path to the backing SQLite database file.</summary>
+    string DatabasePath { get; }
+
     // Books
     Task<int> AddBookAsync(Book book);
     Task<List<int>> AddBooksAsync(IReadOnlyList<Book> books);
     Task UpdateBookAsync(Book book);
     Task DeleteBookAsync(int bookId);
+    Task ResetLibraryAsync();
     Task<List<Book>> GetBooksAsync(string? searchQuery = null, int? locationId = null);
     Task<Book?> GetBookByIdAsync(int id);
 

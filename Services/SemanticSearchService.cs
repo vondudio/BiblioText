@@ -82,6 +82,38 @@ internal sealed class SemanticSearchService
     }
 
     /// <summary>
+    /// Remove every supplied book id from the search index. Used by the
+    /// "Reset Library" flow to purge the OS-managed semantic index, which
+    /// otherwise survives a database wipe.
+    /// </summary>
+    public async Task ClearAllAsync(IEnumerable<int> bookIds)
+    {
+        if (_indexer == null || !_isAvailable) return;
+
+        try
+        {
+            await Task.Run(() =>
+            {
+                foreach (var id in bookIds)
+                {
+                    try
+                    {
+                        _indexer.RemoveContentItem(id.ToString());
+                    }
+                    catch
+                    {
+                        // Skip any one id that fails; don't abort the sweep.
+                    }
+                }
+            });
+        }
+        catch
+        {
+            // Silently fail — non-critical.
+        }
+    }
+
+    /// <summary>
     /// Search for books by semantic query. Returns matching book IDs.
     /// The Windows AppContentIndex caps each GetNextMatches call at ~200,
     /// so this method pages until either the index is exhausted or

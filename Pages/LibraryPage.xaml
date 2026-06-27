@@ -44,6 +44,7 @@
                     x:Name="LocationFilter"
                     Grid.Column="1"
                     PlaceholderText="All Locations"
+                    DisplayMemberPath="Name"
                     SelectionChanged="LocationFilter_SelectionChanged"
                     AutomationProperties.Name="Filter by bookshelf location" />
 
@@ -59,6 +60,8 @@
                     <x:String>Author Z→A</x:String>
                     <x:String>Newest First</x:String>
                     <x:String>Oldest First</x:String>
+                    <x:String>Location A→Z</x:String>
+                    <x:String>Location Z→A</x:String>
                 </ComboBox>
 
                 <ComboBox

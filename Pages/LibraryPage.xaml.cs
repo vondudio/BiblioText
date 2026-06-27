@@ -25,6 +25,7 @@ public sealed partial class LibraryPage : Page
     private int? _selectedLocationId;
     private string? _sortOption;
     private string? _statusFilter;
+    private Dictionary<int, string> _locationNamesById = new();
     private (double X, double Y, double W, double H)? _pendingDetectionBox;
 
     public LibraryPage()
@@ -71,6 +72,7 @@ public sealed partial class LibraryPage : Page
         }
 
         var locations = await repo.GetLocationsAsync();
+        _locationNamesById = locations.ToDictionary(l => l.Id, l => l.Name);
 
         books = ApplyStatusFilter(books);
         books = ApplySort(books);
@@ -103,9 +105,22 @@ public sealed partial class LibraryPage : Page
             "Author Z→A" => books.OrderByDescending(b => b.Author ?? "", StringComparer.OrdinalIgnoreCase).ToList(),
             "Newest First" => books.OrderByDescending(b => b.CreatedAt).ToList(),
             "Oldest First" => books.OrderBy(b => b.CreatedAt).ToList(),
+            "Location A→Z" => books
+                .OrderBy(b => string.IsNullOrEmpty(LocationNameFor(b)) ? 1 : 0)
+                .ThenBy(b => LocationNameFor(b), StringComparer.OrdinalIgnoreCase)
+                .ThenBy(b => b.Title, StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            "Location Z→A" => books
+                .OrderBy(b => string.IsNullOrEmpty(LocationNameFor(b)) ? 1 : 0)
+                .ThenByDescending(b => LocationNameFor(b), StringComparer.OrdinalIgnoreCase)
+                .ThenBy(b => b.Title, StringComparer.OrdinalIgnoreCase)
+                .ToList(),
             _ => books
         };
     }
+
+    private string LocationNameFor(Book b) =>
+        b.LocationId is int id && _locationNamesById.TryGetValue(id, out var name) ? name : "";
 
     private List<Book> ApplyStatusFilter(List<Book> books)
     {

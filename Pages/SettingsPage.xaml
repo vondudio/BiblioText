@@ -144,6 +144,28 @@
                     <Button Content="Reset to Defaults" Click="ResetPromptsButton_Click" />
                 </StackPanel>
             </StackPanel>
+
+            <!-- Library Data -->
+            <StackPanel Spacing="12">
+                <TextBlock Text="Library Data" Style="{StaticResource SubtitleTextBlockStyle}" />
+                <TextBlock
+                    Text="Back up your catalog to a .zip archive (database, spine crops, and bookshelf photos), or wipe the library to start fresh. Your Azure / Google Books keys and prompt settings are never touched by either action."
+                    Opacity="0.7"
+                    TextWrapping="Wrap" />
+
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <Button
+                        x:Name="ExportLibraryButton"
+                        Content="Export to .zip…"
+                        Click="ExportLibraryButton_Click"
+                        AutomationProperties.Name="Export library to a zip archive" />
+                    <Button
+                        x:Name="ResetLibraryButton"
+                        Content="Reset Library…"
+                        Click="ResetLibraryButton_Click"
+                        AutomationProperties.Name="Reset library and delete all books" />
+                </StackPanel>
+            </StackPanel>
         </StackPanel>
     </ScrollViewer>
 </Page>

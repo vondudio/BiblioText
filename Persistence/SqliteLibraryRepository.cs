@@ -13,6 +13,7 @@ namespace BiblioText.Persistence;
 public sealed class SqliteLibraryRepository : ILibraryRepository, IDisposable
 {
     private readonly string _connectionString;
+    private readonly string _dbPath;
     private readonly SemaphoreSlim _dbGate = new(1, 1);
     private SqliteConnection? _connection;
 
@@ -22,9 +23,12 @@ public sealed class SqliteLibraryRepository : ILibraryRepository, IDisposable
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "BiblioText");
         Directory.CreateDirectory(folder);
-        var dbPath = Path.Combine(folder, "library.db");
-        _connectionString = $"Data Source={dbPath}";
+        _dbPath = Path.Combine(folder, "library.db");
+        _connectionString = $"Data Source={_dbPath}";
     }
+
+    /// <summary>Absolute path to the backing SQLite database file.</summary>
+    public string DatabasePath => _dbPath;
 
     public async Task InitializeAsync()
     {
@@ -412,13 +416,40 @@ public sealed class SqliteLibraryRepository : ILibraryRepository, IDisposable
         }
     }
 
+    /// <summary>
+    /// Wipes all library content — books, scans, locations, image-dedup
+    /// hashes — and rebuilds the FTS index. Schema is preserved; settings
+    /// (keys/prompts) live in a separate store and are untouched. Spine crop
+    /// files on disk and the semantic index are the caller's responsibility.
+    /// </summary>
+    public async Task ResetLibraryAsync()
+    {
+        await _dbGate.WaitAsync();
+        try
+        {
+            EnsureConnected();
+            using var cmd = _connection!.CreateCommand();
+            cmd.CommandText = """
+                DELETE FROM books;
+                DELETE FROM scans;
+                DELETE FROM locations;
+                DELETE FROM image_hashes;
+                INSERT INTO books_fts(books_fts) VALUES('rebuild');
+                """;
+            await cmd.ExecuteNonQueryAsync();
+        }
+        finally
+        {
+            _dbGate.Release();
+        }
+    }
+
     public async Task<List<Book>> GetBooksAsync(string? searchQuery = null, int? locationId = null)
     {
         await _dbGate.WaitAsync();
         try
         {
             EnsureConnected();
-
             // For non-trivial searches we run BOTH FTS5 (relevance-ranked,
             // prefix-matched, handles multi-token AND) and LIKE (substring,
             // catches 'art' inside 'Heart'). Merged so FTS hits lead the

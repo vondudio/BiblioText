@@ -840,6 +840,7 @@ internal sealed partial class Sample : Microsoft.UI.Xaml.Controls.Page
         if (_images.Count == 0)
         {
             DefaultImage.Source = null;
+            ClearBoxOverlay();
             StatusText.Text = string.Empty;
             StatusBar.Visibility = Visibility.Collapsed;
             RemoveButton.IsEnabled = false;
