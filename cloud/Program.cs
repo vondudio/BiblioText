@@ -83,6 +83,14 @@ builder.Services.AddRazorPages(options =>
 
 var app = builder.Build();
 
+// Apply EF migrations at startup so a fresh deploy self-provisions its schema
+// (and the pgvector extension). Fail fast if the catalog DB is unreachable.
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
+    db.Database.Migrate();
+}
+
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {

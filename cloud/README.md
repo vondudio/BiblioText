@@ -6,9 +6,10 @@ website** (semantic search + "who owns it / where it lives"). Backed by
 Postgres + [pgvector](https://github.com/pgvector/pgvector) for embeddings and
 optional Azure Blob storage for images.
 
-> Status: **Phase 3 — backend.** The publish API, catalog store, embedding and
-> image services, and search API are in place. The member website pages
-> (browse/search UI) and magic-link auth land in Phase 4.
+> Status: **Phase 5 — deployed.** The publish API, catalog store, embedding and
+> image services, search API (Phase 3), the member website + magic-link auth
+> (Phase 4), and a live Azure deployment with real Foundry embeddings (Phase 5)
+> are all in place.
 
 ## Architecture
 
@@ -48,6 +49,9 @@ in App Service config / Key Vault / user-secrets — never in source.
 | `Catalog:AzureOpenAI:EmbeddingDeployment` | Deployment name | `text-embedding-3-small` |
 | `Catalog:Blob:ConnectionString` | Azure Blob storage | local `wwwroot/uploads` |
 | `Catalog:Blob:Container` / `PublicBaseUrl` | Blob container / CDN prefix | `book-images` / blob URL |
+| `Auth:DevMode` | Show the magic link on-screen instead of emailing it | `false` (email required) |
+| `Auth:AllowedEmails` | Allowlist of member emails permitted to sign in | empty (nobody can sign in) |
+| `Auth:MagicLinkLifetimeMinutes` / `SessionLifetimeDays` | Token + cookie lifetimes | `15` / `30` |
 
 ## Run locally
 
@@ -68,7 +72,38 @@ With no Azure settings it uses the deterministic embedder and local image
 storage, so `POST /api/publish` and `GET /api/search?q=...` work end-to-end
 without any cloud account.
 
-## API
+## Deploy to Azure
+
+The app is a framework-dependent ASP.NET Core deploy to a single Linux App
+Service. On startup it runs `Database.Migrate()`, so a fresh database
+self-provisions its schema (and the pgvector extension) on first boot — no
+manual migration step against the cloud DB.
+
+Provisioned resources (one resource group):
+
+- **Azure Database for PostgreSQL Flexible Server** (public access + firewall
+  rules for your IP and *Allow Azure services*), `azure.extensions=vector`
+  enabled, a database created for the app.
+- **Azure AI Foundry / OpenAI** with a `text-embedding-3-small` deployment.
+- **Azure Storage** account with a public-read `book-images` blob container.
+- **App Service** (Linux, `DOTNETCORE:10.0`) with all `Catalog:*`, `Auth:*`,
+  and `ConnectionStrings:Catalog` values set in configuration.
+
+```powershell
+dotnet publish cloud\BiblioText.Cloud.csproj -c Release -o publish
+Compress-Archive -Path publish\* -DestinationPath app.zip -Force
+az webapp deploy --resource-group <rg> --name <app> --type zip --src-path app.zip
+```
+
+> **App settings gotcha:** connection strings contain `;`, which breaks inline
+> `az ... --settings key=val`. Pass a JSON array via `--settings "@file.json"`.
+
+> **Publish batch size:** very large `POST /api/publish` bodies (multi-MB, e.g.
+> dozens of books with inline spine images) can be rejected with a `400`. Send
+> books in smaller chunks — upserts are idempotent by `stationId+stationBookId`,
+> so chunking (or retrying) is safe.
+
+
 
 - `POST /api/publish` — body is a `BiblioText.Contracts.PublishBatch`; requires
   `X-Operator-Token` when one is configured. Returns a `PublishResult`.
