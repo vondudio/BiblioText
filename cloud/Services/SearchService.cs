@@ -36,8 +36,8 @@ public sealed class SearchService(CatalogDbContext db, IEmbeddingService embeddi
             {
                 Book = b,
                 Distance = (double?)b.Embedding!.CosineDistance(queryVector),
+                Copies = b.Copies.ToList(),
             })
-            .Include(x => x.Book.Copies)
             .ToListAsync(cancellationToken);
 
         return ranked.Select(x => Map(x.Book, x.Distance)).ToList();
