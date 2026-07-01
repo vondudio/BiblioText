@@ -1,0 +1,87 @@
+@page "{id:int}"
+@model BookModel
+@{
+    ViewData["Title"] = Model.Book?.Title ?? "Book";
+    var book = Model.Book!;
+    var cover = book.CoverImageUrl;
+    var spine = book.Copies.Select(c => c.SpineImageUrl).FirstOrDefault(s => !string.IsNullOrEmpty(s));
+}
+
+<nav aria-label="breadcrumb" class="mb-3">
+    <a asp-page="/Index" class="text-decoration-none">&larr; Back to catalog</a>
+</nav>
+
+<div class="row g-4">
+    <div class="col-md-4 col-lg-3">
+        <div class="book-detail-cover">
+            @if (!string.IsNullOrEmpty(cover))
+            {
+                <img src="@cover" alt="Cover of @book.Title" />
+            }
+            else if (!string.IsNullOrEmpty(spine))
+            {
+                <img src="@spine" alt="Spine of @book.Title" class="spine-img" />
+            }
+            else
+            {
+                <div class="book-thumb-placeholder large">@book.Title</div>
+            }
+        </div>
+    </div>
+
+    <div class="col-md-8 col-lg-9">
+        <h1 class="h2 mb-1">@book.Title</h1>
+        @if (!string.IsNullOrEmpty(book.Author))
+        {
+            <p class="lead text-muted mb-2">@book.Author</p>
+        }
+
+        @if (Model.Badges.Count > 0)
+        {
+            <div class="mb-3">
+                @foreach (var badge in Model.Badges)
+                {
+                    <span class="badge source-badge" title="@badge.Title">@badge.Label</span>
+                }
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(book.LongDescription))
+        {
+            <p class="book-description">@book.LongDescription</p>
+        }
+        else if (!string.IsNullOrEmpty(book.ShortDescription))
+        {
+            <p class="book-description">@book.ShortDescription</p>
+        }
+        else
+        {
+            <p class="text-muted fst-italic">No description available.</p>
+        }
+
+        <hr class="my-4" />
+
+        <h2 class="h5 mb-3">Where to find it</h2>
+        <div class="list-group">
+            @foreach (var copy in book.Copies)
+            {
+                <div class="list-group-item d-flex align-items-center gap-3">
+                    @if (!string.IsNullOrEmpty(copy.SpineImageUrl))
+                    {
+                        <img src="@copy.SpineImageUrl" alt="Spine" class="copy-spine" />
+                    }
+                    <div>
+                        <div class="fw-semibold">@(string.IsNullOrEmpty(copy.OwnerHousehold) ? "Unknown shelf" : copy.OwnerHousehold)</div>
+                        @if (!string.IsNullOrEmpty(copy.ShelfLocation))
+                        {
+                            <div class="text-muted small">@copy.ShelfLocation</div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+        <p class="text-muted small mt-2">
+            To borrow, reach out to the owner directly.
+        </p>
+    </div>
+</div>

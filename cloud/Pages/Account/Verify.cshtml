@@ -1,0 +1,13 @@
+@page
+@model BiblioText.Cloud.Pages.Account.VerifyModel
+@{
+    ViewData["Title"] = "Sign in";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5 text-center">
+        <h1 class="h3 mb-3">Sign-in link invalid</h1>
+        <p class="text-muted">This sign-in link is expired or has already been used.</p>
+        <a asp-page="/Account/Login" class="btn btn-primary">Request a new link</a>
+    </div>
+</div>

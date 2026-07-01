@@ -70,3 +70,7 @@ Desktop.ini
 # Reference samples
 Select_Text_From_ImageSample/
 EXTRA/
+
+# ASP.NET Core Data Protection key ring (local dev)
+dp-keys/
+cloud/dp-keys/

@@ -54,6 +54,25 @@ public sealed class SearchService(CatalogDbContext db, IEmbeddingService embeddi
         return books.Select(b => Map(b, null)).ToList();
     }
 
+    /// <summary>Loads a single book with its copies for the detail page.</summary>
+    public async Task<BookResult?> GetBookAsync(int bookId, CancellationToken cancellationToken = default)
+    {
+        var book = await db.Books
+            .Include(b => b.Copies)
+            .FirstOrDefaultAsync(b => b.Id == bookId, cancellationToken);
+
+        return book is null ? null : Map(book, null);
+    }
+
+    /// <summary>Distinct owner households present in the catalog, for the browse filter.</summary>
+    public async Task<IReadOnlyList<string>> GetOwnersAsync(CancellationToken cancellationToken = default) =>
+        await db.Copies
+            .Where(c => c.OwnerHousehold != null && c.OwnerHousehold != "")
+            .Select(c => c.OwnerHousehold!)
+            .Distinct()
+            .OrderBy(o => o)
+            .ToListAsync(cancellationToken);
+
     private static BookResult Map(Book book, double? distance) => new()
     {
         BookId = book.Id,

@@ -1,6 +1,9 @@
 using BiblioText.Cloud.Api;
+using BiblioText.Cloud.Auth;
 using BiblioText.Cloud.Catalog;
 using BiblioText.Cloud.Services;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -43,7 +46,40 @@ else
 builder.Services.AddScoped<PublishService>();
 builder.Services.AddScoped<SearchService>();
 
-builder.Services.AddRazorPages();
+// Members-only auth: config allowlist + passwordless magic links + cookie session.
+var authOptions = builder.Configuration
+    .GetSection(AuthOptions.SectionName)
+    .Get<AuthOptions>() ?? new AuthOptions();
+builder.Services.AddSingleton(authOptions);
+builder.Services.AddScoped<MagicLinkService>();
+
+// Persist Data Protection keys so magic links + session cookies survive restarts.
+// (Phase 5: move key ring to Blob/Key Vault for a multi-instance deploy.)
+var keyRingPath = Path.Combine(builder.Environment.ContentRootPath, "dp-keys");
+builder.Services.AddDataProtection()
+    .SetApplicationName("BiblioText.Cloud")
+    .PersistKeysToFileSystem(new DirectoryInfo(keyRingPath));
+
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.LoginPath = "/Account/Login";
+        options.LogoutPath = "/Account/Logout";
+        options.AccessDeniedPath = "/Account/Login";
+        options.ExpireTimeSpan = authOptions.SessionLifetime;
+        options.SlidingExpiration = true;
+        options.Cookie.Name = "BiblioText.Members";
+    });
+builder.Services.AddAuthorization();
+
+// Catalog pages require a signed-in member; account + error pages stay anonymous.
+builder.Services.AddRazorPages(options =>
+{
+    options.Conventions.AuthorizeFolder("/");
+    options.Conventions.AllowAnonymousToFolder("/Account");
+    options.Conventions.AllowAnonymousToPage("/Error");
+    options.Conventions.AllowAnonymousToPage("/Privacy");
+});
 
 var app = builder.Build();
 
@@ -56,6 +92,7 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseRouting();
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapStaticAssets();

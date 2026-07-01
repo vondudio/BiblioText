@@ -1,10 +1,109 @@
-﻿@page
+@page
+@using BiblioText.Cloud.Services
 @model IndexModel
 @{
-    ViewData["Title"] = "Home page";
+    ViewData["Title"] = "Catalog";
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+<div class="catalog-hero mb-4">
+    <h1 class="h3 mb-3">Search the shelves</h1>
+    <form method="get" class="row g-2 align-items-end">
+        <div class="col-md-7">
+            <label for="q" class="form-label small text-muted">What are you looking for?</label>
+            <input type="search" id="q" name="q" value="@Model.Query" class="form-control form-control-lg"
+                   placeholder="e.g. a desert planet, Victorian ghost stories, learning to cook" autofocus />
+        </div>
+        <div class="col-md-3">
+            <label for="owner" class="form-label small text-muted">Whose shelf</label>
+            <select id="owner" name="owner" class="form-select form-select-lg">
+                <option value="">Everyone</option>
+                @foreach (var owner in Model.Owners)
+                {
+                    <option value="@owner" selected="@(owner == Model.Owner)">@owner</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-2 d-grid">
+            <button type="submit" class="btn btn-primary btn-lg">Search</button>
+        </div>
+    </form>
 </div>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="text-muted small">
+        @if (Model.IsSemantic)
+        {
+            <span>Best matches for &ldquo;<strong>@Model.Query</strong>&rdquo;</span>
+        }
+        else
+        {
+            <span>Recently added</span>
+        }
+        <span>&middot; @Model.Results.Count book@(Model.Results.Count == 1 ? "" : "s")</span>
+    </div>
+    @if (Model.IsSemantic || !string.IsNullOrEmpty(Model.Owner))
+    {
+        <a asp-page="/Index" class="btn btn-sm btn-outline-secondary">Clear</a>
+    }
+</div>
+
+@if (Model.Results.Count == 0)
+{
+    <div class="text-center text-muted py-5">
+        <p class="mb-1">No books found.</p>
+        <p class="small">Try a broader search, or clear the filters.</p>
+    </div>
+}
+else
+{
+    <div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3">
+        @foreach (var book in Model.Results)
+        {
+            var cover = book.CoverImageUrl;
+            var spine = book.Copies.Select(c => c.SpineImageUrl).FirstOrDefault(s => !string.IsNullOrEmpty(s));
+            var owners = book.Copies
+                .Select(c => c.OwnerHousehold)
+                .Where(o => !string.IsNullOrEmpty(o))
+                .Distinct()
+                .ToList();
+            <div class="col">
+                <a asp-page="/Book" asp-route-id="@book.BookId" class="card book-card h-100 text-decoration-none">
+                    <div class="book-thumb">
+                        @if (!string.IsNullOrEmpty(cover))
+                        {
+                            <img src="@cover" alt="Cover of @book.Title" loading="lazy" />
+                        }
+                        else if (!string.IsNullOrEmpty(spine))
+                        {
+                            <img src="@spine" alt="Spine of @book.Title" class="spine-img" loading="lazy" />
+                        }
+                        else
+                        {
+                            <div class="book-thumb-placeholder">@book.Title</div>
+                        }
+                        @if (Model.IsSemantic && book.Distance is not null)
+                        {
+                            <span class="match-badge">@IndexModel.MatchPercent(book.Distance)%</span>
+                        }
+                    </div>
+                    <div class="card-body p-2">
+                        <div class="book-title" title="@book.Title">@book.Title</div>
+                        @if (!string.IsNullOrEmpty(book.Author))
+                        {
+                            <div class="book-author text-muted small">@book.Author</div>
+                        }
+                        @if (owners.Count > 0)
+                        {
+                            <div class="mt-1">
+                                @foreach (var owner in owners)
+                                {
+                                    <span class="badge owner-badge">@owner</span>
+                                }
+                            </div>
+                        }
+                    </div>
+                </a>
+            </div>
+        }
+    </div>
+}
