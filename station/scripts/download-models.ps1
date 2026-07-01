@@ -27,7 +27,8 @@
     'seg'    -> yolo26{size}-seg.onnx (instance segmentation, output [1,300,38] + prototype tensor [1,32,160,160])
 
 .PARAMETER ModelsDir
-    Output directory. Defaults to <repo-root>\Models.
+    Output directory. Defaults to the station project's Models folder
+    (station\Models), which is where the build packages *.onnx from.
 
 .PARAMETER Ref
     Hugging Face revision (branch / tag / commit) to pin against. Defaults to 'main'.

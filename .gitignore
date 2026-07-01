@@ -44,12 +44,14 @@ GeneratedAppxManifest.xml
 # The ONNX weights are NOT redistributed in this repo:
 #  - yolov4.onnx is too large for GitHub (>100 MB hard limit on a single file).
 #  - YOLO26 weights are AGPL-3.0 (Ultralytics). Users fetch them via
-#    scripts\download-models.ps1 (HF mirror) or export from .pt themselves.
-Models/*.onnx
-Models/*.data
-Models/*.CPU.onnx
-Models/*.NPU.onnx
-Models/*.GPU.onnx
+#    station\scripts\download-models.ps1 (HF mirror) or export from .pt themselves.
+# Match a Models/ folder at any depth (weights live in station/Models/ after the
+# monorepo reorg; the leading **/ also keeps the legacy repo-root path ignored).
+**/Models/*.onnx
+**/Models/*.data
+**/Models/*.CPU.onnx
+**/Models/*.NPU.onnx
+**/Models/*.GPU.onnx
 
 # ---------------------------------------------------------------------------
 # Per-script venv / temp artifacts
