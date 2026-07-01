@@ -26,6 +26,12 @@ public interface ILibraryRepository
     /// and stores the content <paramref name="syncHash"/> used to detect later edits.
     /// </summary>
     Task MarkBookSyncedAsync(int bookId, string syncHash, System.DateTime syncedAtUtc);
+
+    /// <summary>Station-book-ids of previously-published books deleted locally, awaiting cloud unpublish.</summary>
+    Task<System.Collections.Generic.List<string>> GetCloudUnpublishQueueAsync();
+
+    /// <summary>Removes the given ids from the unpublish queue after a successful cloud sync.</summary>
+    Task ClearCloudUnpublishQueueAsync(System.Collections.Generic.IEnumerable<string> stationBookIds);
     Task<List<Book>> GetBooksAsync(string? searchQuery = null, int? locationId = null);
     Task<Book?> GetBookByIdAsync(int id);
 

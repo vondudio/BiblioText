@@ -87,6 +87,11 @@ public sealed class SqliteLibraryRepository : ILibraryRepository, IDisposable
                 file_path TEXT NOT NULL,
                 imported_at TEXT NOT NULL DEFAULT (datetime('now'))
             );
+
+            CREATE TABLE IF NOT EXISTS cloud_unpublish_queue (
+                station_book_id TEXT PRIMARY KEY,
+                queued_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
             """;
         await cmd.ExecuteNonQueryAsync();
 
@@ -437,10 +442,72 @@ public sealed class SqliteLibraryRepository : ILibraryRepository, IDisposable
         try
         {
             EnsureConnected();
+
+            // If this book was ever published, remember its station id so the next
+            // sync can unpublish it from the cloud.
+            using (var lookup = _connection!.CreateCommand())
+            {
+                lookup.CommandText = "SELECT station_book_id FROM books WHERE id=@id AND cloud_synced_at IS NOT NULL AND station_book_id IS NOT NULL;";
+                lookup.Parameters.AddWithValue("@id", bookId);
+                var stationBookId = await lookup.ExecuteScalarAsync() as string;
+                if (!string.IsNullOrEmpty(stationBookId))
+                {
+                    using var queue = _connection!.CreateCommand();
+                    queue.CommandText = "INSERT OR IGNORE INTO cloud_unpublish_queue (station_book_id) VALUES (@sbid);";
+                    queue.Parameters.AddWithValue("@sbid", stationBookId);
+                    await queue.ExecuteNonQueryAsync();
+                }
+            }
+
             using var cmd = _connection!.CreateCommand();
             cmd.CommandText = "DELETE FROM books WHERE id=@id;";
             cmd.Parameters.AddWithValue("@id", bookId);
             await cmd.ExecuteNonQueryAsync();
+        }
+        finally
+        {
+            _dbGate.Release();
+        }
+    }
+
+    public async Task<List<string>> GetCloudUnpublishQueueAsync()
+    {
+        await _dbGate.WaitAsync();
+        try
+        {
+            EnsureConnected();
+            using var cmd = _connection!.CreateCommand();
+            cmd.CommandText = "SELECT station_book_id FROM cloud_unpublish_queue ORDER BY queued_at;";
+            var ids = new List<string>();
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                ids.Add(reader.GetString(0));
+            }
+            return ids;
+        }
+        finally
+        {
+            _dbGate.Release();
+        }
+    }
+
+    public async Task ClearCloudUnpublishQueueAsync(IEnumerable<string> stationBookIds)
+    {
+        await _dbGate.WaitAsync();
+        try
+        {
+            EnsureConnected();
+            using var tx = (SqliteTransaction)await _connection!.BeginTransactionAsync();
+            foreach (var id in stationBookIds)
+            {
+                using var cmd = _connection!.CreateCommand();
+                cmd.Transaction = tx;
+                cmd.CommandText = "DELETE FROM cloud_unpublish_queue WHERE station_book_id=@sbid;";
+                cmd.Parameters.AddWithValue("@sbid", id);
+                await cmd.ExecuteNonQueryAsync();
+            }
+            await tx.CommitAsync();
         }
         finally
         {
