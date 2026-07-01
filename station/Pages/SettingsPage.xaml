@@ -83,11 +83,61 @@
                     AutomationProperties.Name="Google Books API key" />
             </StackPanel>
 
+            <!-- Cloud Publishing -->
+            <StackPanel Spacing="12">
+                <TextBlock Text="Cloud Publishing" Style="{StaticResource SubtitleTextBlockStyle}" />
+                <TextBlock TextWrapping="Wrap" Opacity="0.7"
+                    Text="Publish your reviewed catalog to the BiblioText cloud so it can be searched on the website. Leave the endpoint blank to keep everything local." />
+
+                <TextBox
+                    x:Name="CloudEndpointBox"
+                    Header="Cloud Endpoint"
+                    PlaceholderText="https://your-bibliotext.azurewebsites.net"
+                    AutomationProperties.Name="Cloud endpoint URL" />
+
+                <PasswordBox
+                    x:Name="CloudOperatorTokenBox"
+                    Header="Operator Token"
+                    PlaceholderText="Shared publish secret"
+                    AutomationProperties.Name="Cloud operator token" />
+
+                <TextBox
+                    x:Name="OwnerHouseholdBox"
+                    Header="Owner / Household"
+                    PlaceholderText="e.g. The Anderson Family"
+                    AutomationProperties.Name="Owner or household label" />
+
+                <TextBox
+                    x:Name="StationIdBox"
+                    Header="Station ID (auto-generated)"
+                    IsReadOnly="True"
+                    IsTabStop="False"
+                    AutomationProperties.Name="Station identifier" />
+
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <Button
+                        Content="Save"
+                        Click="SaveButton_Click"
+                        Style="{StaticResource AccentButtonStyle}"
+                        AutomationProperties.Name="Save cloud settings" />
+                    <Button
+                        x:Name="TestCloudButton"
+                        Content="Test Connection"
+                        Click="TestCloudButton_Click"
+                        AutomationProperties.Name="Test cloud connection" />
+                </StackPanel>
+
+                <InfoBar
+                    x:Name="CloudStatusBar"
+                    IsOpen="False"
+                    IsClosable="True" />
+            </StackPanel>
+
             <!-- Info about env vars -->
             <StackPanel Spacing="8">
                 <TextBlock Text="Environment Variable Fallback" Style="{StaticResource BodyStrongTextBlockStyle}" />
                 <TextBlock TextWrapping="Wrap" Opacity="0.6" FontSize="12"
-                    Text="If no settings are saved above, the app will try these environment variables: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT, AZURE_OPENAI_API_VERSION, GOOGLE_BOOKS_API_KEY" />
+                    Text="If no settings are saved above, the app will try these environment variables: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT, AZURE_OPENAI_API_VERSION, GOOGLE_BOOKS_API_KEY, BIBLIOTEXT_CLOUD_ENDPOINT, BIBLIOTEXT_CLOUD_OPERATOR_TOKEN, BIBLIOTEXT_STATION_ID, BIBLIOTEXT_OWNER_HOUSEHOLD" />
             </StackPanel>
 
             <!-- Camera -->

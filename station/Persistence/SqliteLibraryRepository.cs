@@ -74,6 +74,9 @@ public sealed class SqliteLibraryRepository : ILibraryRepository, IDisposable
                 description_sources_json TEXT,
                 description_generated_at TEXT,
                 notes TEXT,
+                station_book_id TEXT,
+                cloud_synced_at TEXT,
+                sync_hash TEXT,
                 FOREIGN KEY (scan_id) REFERENCES scans(id),
                 FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE SET NULL
             );
@@ -147,6 +150,24 @@ public sealed class SqliteLibraryRepository : ILibraryRepository, IDisposable
         {
             using var alter = _connection!.CreateCommand();
             alter.CommandText = "ALTER TABLE books ADD COLUMN description_generated_at TEXT;";
+            await alter.ExecuteNonQueryAsync();
+        }
+        if (!columns.Contains("station_book_id"))
+        {
+            using var alter = _connection!.CreateCommand();
+            alter.CommandText = "ALTER TABLE books ADD COLUMN station_book_id TEXT;";
+            await alter.ExecuteNonQueryAsync();
+        }
+        if (!columns.Contains("cloud_synced_at"))
+        {
+            using var alter = _connection!.CreateCommand();
+            alter.CommandText = "ALTER TABLE books ADD COLUMN cloud_synced_at TEXT;";
+            await alter.ExecuteNonQueryAsync();
+        }
+        if (!columns.Contains("sync_hash"))
+        {
+            using var alter = _connection!.CreateCommand();
+            alter.CommandText = "ALTER TABLE books ADD COLUMN sync_hash TEXT;";
             await alter.ExecuteNonQueryAsync();
         }
 
@@ -335,8 +356,8 @@ public sealed class SqliteLibraryRepository : ILibraryRepository, IDisposable
         using var cmd = _connection!.CreateCommand();
         cmd.Transaction = transaction;
         cmd.CommandText = """
-            INSERT INTO books (title, author, short_description, long_description, scan_id, location_id, spine_image_path, bookshelf_image_path, detection_index, spine_box_norm, created_at, is_duplicate, is_description_grounded, description_sources_json, description_generated_at, notes)
-            VALUES (@title, @author, @shortDesc, @longDesc, @scanId, @locationId, @spinePath, @bookshelfPath, @detectionIndex, @spineBoxNorm, @createdAt, @isDuplicate, @isDescriptionGrounded, @descriptionSourcesJson, @descriptionGeneratedAt, @notes);
+            INSERT INTO books (title, author, short_description, long_description, scan_id, location_id, spine_image_path, bookshelf_image_path, detection_index, spine_box_norm, created_at, is_duplicate, is_description_grounded, description_sources_json, description_generated_at, notes, station_book_id, cloud_synced_at, sync_hash)
+            VALUES (@title, @author, @shortDesc, @longDesc, @scanId, @locationId, @spinePath, @bookshelfPath, @detectionIndex, @spineBoxNorm, @createdAt, @isDuplicate, @isDescriptionGrounded, @descriptionSourcesJson, @descriptionGeneratedAt, @notes, @stationBookId, @cloudSyncedAt, @syncHash);
             SELECT last_insert_rowid();
             """;
         cmd.Parameters.AddWithValue("@title", book.Title);
@@ -355,6 +376,16 @@ public sealed class SqliteLibraryRepository : ILibraryRepository, IDisposable
         cmd.Parameters.AddWithValue("@descriptionSourcesJson", (object?)book.DescriptionSourcesJson ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@descriptionGeneratedAt", book.DescriptionGeneratedAt.HasValue ? book.DescriptionGeneratedAt.Value.ToString("o") : DBNull.Value);
         cmd.Parameters.AddWithValue("@notes", (object?)book.Notes ?? DBNull.Value);
+
+        // Assign a stable station-side id on first insert so the cloud has a
+        // durable upsert key even before the book is ever published.
+        if (string.IsNullOrEmpty(book.StationBookId))
+        {
+            book.StationBookId = Guid.NewGuid().ToString("n");
+        }
+        cmd.Parameters.AddWithValue("@stationBookId", book.StationBookId);
+        cmd.Parameters.AddWithValue("@cloudSyncedAt", book.CloudSyncedAt.HasValue ? book.CloudSyncedAt.Value.ToString("o") : DBNull.Value);
+        cmd.Parameters.AddWithValue("@syncHash", (object?)book.SyncHash ?? DBNull.Value);
 
         var result = await cmd.ExecuteScalarAsync();
         book.Id = Convert.ToInt32(result);
@@ -409,6 +440,25 @@ public sealed class SqliteLibraryRepository : ILibraryRepository, IDisposable
             using var cmd = _connection!.CreateCommand();
             cmd.CommandText = "DELETE FROM books WHERE id=@id;";
             cmd.Parameters.AddWithValue("@id", bookId);
+            await cmd.ExecuteNonQueryAsync();
+        }
+        finally
+        {
+            _dbGate.Release();
+        }
+    }
+
+    public async Task MarkBookSyncedAsync(int bookId, string syncHash, DateTime syncedAtUtc)
+    {
+        await _dbGate.WaitAsync();
+        try
+        {
+            EnsureConnected();
+            using var cmd = _connection!.CreateCommand();
+            cmd.CommandText = "UPDATE books SET cloud_synced_at=@syncedAt, sync_hash=@syncHash WHERE id=@id;";
+            cmd.Parameters.AddWithValue("@id", bookId);
+            cmd.Parameters.AddWithValue("@syncedAt", syncedAtUtc.ToString("o"));
+            cmd.Parameters.AddWithValue("@syncHash", syncHash);
             await cmd.ExecuteNonQueryAsync();
         }
         finally
@@ -809,7 +859,10 @@ public sealed class SqliteLibraryRepository : ILibraryRepository, IDisposable
             IsDescriptionGrounded = reader.GetInt32(reader.GetOrdinal("is_description_grounded")) == 1,
             DescriptionSourcesJson = reader.IsDBNull(reader.GetOrdinal("description_sources_json")) ? null : reader.GetString(reader.GetOrdinal("description_sources_json")),
             DescriptionGeneratedAt = reader.IsDBNull(reader.GetOrdinal("description_generated_at")) ? null : DateTime.Parse(reader.GetString(reader.GetOrdinal("description_generated_at"))),
-            Notes = reader.IsDBNull(reader.GetOrdinal("notes")) ? null : reader.GetString(reader.GetOrdinal("notes"))
+            Notes = reader.IsDBNull(reader.GetOrdinal("notes")) ? null : reader.GetString(reader.GetOrdinal("notes")),
+            StationBookId = reader.IsDBNull(reader.GetOrdinal("station_book_id")) ? null : reader.GetString(reader.GetOrdinal("station_book_id")),
+            CloudSyncedAt = reader.IsDBNull(reader.GetOrdinal("cloud_synced_at")) ? null : DateTime.Parse(reader.GetString(reader.GetOrdinal("cloud_synced_at"))),
+            SyncHash = reader.IsDBNull(reader.GetOrdinal("sync_hash")) ? null : reader.GetString(reader.GetOrdinal("sync_hash"))
         };
     }
 

@@ -20,6 +20,12 @@ public interface ILibraryRepository
     Task DeleteBookAsync(int bookId);
     Task ResetLibraryAsync();
     Task RecomputeDuplicateFlagsAsync();
+
+    /// <summary>
+    /// Records a successful cloud publish for a book: stamps <c>cloud_synced_at</c>
+    /// and stores the content <paramref name="syncHash"/> used to detect later edits.
+    /// </summary>
+    Task MarkBookSyncedAsync(int bookId, string syncHash, System.DateTime syncedAtUtc);
     Task<List<Book>> GetBooksAsync(string? searchQuery = null, int? locationId = null);
     Task<Book?> GetBookByIdAsync(int id);
 

@@ -31,4 +31,19 @@ public sealed class Book
     public string? DescriptionSourcesJson { get; set; }
     public DateTime? DescriptionGeneratedAt { get; set; }
     public string? Notes { get; set; }
+
+    /// <summary>
+    /// Stable, station-assigned identifier used as the cloud upsert/idempotency
+    /// key. Generated once (a GUID) when the book is first inserted; never reused.
+    /// </summary>
+    public string? StationBookId { get; set; }
+
+    /// <summary>UTC time this book was last successfully published to the cloud; null if never.</summary>
+    public DateTime? CloudSyncedAt { get; set; }
+
+    /// <summary>
+    /// Content hash captured at the last successful publish. Compared against the
+    /// current content hash to decide whether the book is "dirty" (needs re-upload).
+    /// </summary>
+    public string? SyncHash { get; set; }
 }

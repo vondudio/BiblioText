@@ -54,6 +54,18 @@ public sealed partial class SettingsPage : Page
         BookshelfSystemPromptBox.Text = settings.BookshelfAnalysisSystemPrompt ?? Services.DefaultPrompts.BookshelfAnalysisSystem;
         BookshelfUserPromptBox.Text = settings.BookshelfAnalysisUserPrompt ?? Services.DefaultPrompts.BookshelfAnalysisUser;
         DescriptionPromptBox.Text = settings.BookDescriptionPrompt ?? Services.DefaultPrompts.BookDescription;
+
+        CloudEndpointBox.Text = settings.CloudEndpoint ?? "";
+        CloudOperatorTokenBox.Password = settings.CloudOperatorToken ?? "";
+        OwnerHouseholdBox.Text = settings.OwnerHousehold ?? "";
+
+        // Ensure a stable station id exists and is persisted the first time.
+        if (string.IsNullOrWhiteSpace(settings.StationId))
+        {
+            settings.StationId = Guid.NewGuid().ToString("n");
+            store.Save(settings);
+        }
+        StationIdBox.Text = settings.StationId;
     }
 
     private void SaveButton_Click(object sender, RoutedEventArgs e)
@@ -73,9 +85,16 @@ public sealed partial class SettingsPage : Page
             BookshelfAnalysisSystemPrompt = NullIfEmpty(BookshelfSystemPromptBox.Text),
             BookshelfAnalysisUserPrompt = NullIfEmpty(BookshelfUserPromptBox.Text),
             BookDescriptionPrompt = NullIfEmpty(DescriptionPromptBox.Text),
+            CloudEndpoint = NullIfEmpty(CloudEndpointBox.Text),
+            CloudOperatorToken = NullIfEmpty(CloudOperatorTokenBox.Password),
+            OwnerHousehold = NullIfEmpty(OwnerHouseholdBox.Text),
+            StationId = NullIfEmpty(StationIdBox.Text) ?? Guid.NewGuid().ToString("n"),
         };
 
         store.Save(settings);
+
+        // Reflect a freshly generated station id back into the UI.
+        StationIdBox.Text = settings.StationId;
 
         StatusBar.IsOpen = true;
         StatusBar.Severity = InfoBarSeverity.Success;
@@ -168,6 +187,50 @@ public sealed partial class SettingsPage : Page
         BookshelfSystemPromptBox.Text = Services.DefaultPrompts.BookshelfAnalysisSystem;
         BookshelfUserPromptBox.Text = Services.DefaultPrompts.BookshelfAnalysisUser;
         DescriptionPromptBox.Text = Services.DefaultPrompts.BookDescription;
+    }
+
+    private async void TestCloudButton_Click(object sender, RoutedEventArgs e)
+    {
+        var endpoint = CloudEndpointBox.Text.Trim();
+        if (string.IsNullOrWhiteSpace(endpoint))
+        {
+            CloudStatusBar.IsOpen = true;
+            CloudStatusBar.Severity = InfoBarSeverity.Warning;
+            CloudStatusBar.Message = "Enter the cloud endpoint before testing.";
+            return;
+        }
+
+        TestCloudButton.IsEnabled = false;
+        try
+        {
+            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+            // The search endpoint is unauthenticated and cheap — a good reachability probe.
+            var url = $"{endpoint.TrimEnd('/')}/api/search?limit=1";
+            using var response = await client.GetAsync(url);
+
+            if (response.IsSuccessStatusCode)
+            {
+                CloudStatusBar.IsOpen = true;
+                CloudStatusBar.Severity = InfoBarSeverity.Success;
+                CloudStatusBar.Message = "Connection successful! The cloud is reachable.";
+            }
+            else
+            {
+                CloudStatusBar.IsOpen = true;
+                CloudStatusBar.Severity = InfoBarSeverity.Error;
+                CloudStatusBar.Message = $"Cloud responded with {(int)response.StatusCode} {response.ReasonPhrase}.";
+            }
+        }
+        catch (Exception ex)
+        {
+            CloudStatusBar.IsOpen = true;
+            CloudStatusBar.Severity = InfoBarSeverity.Error;
+            CloudStatusBar.Message = $"Connection failed: {ex.Message}";
+        }
+        finally
+        {
+            TestCloudButton.IsEnabled = true;
+        }
     }
 
     private static string? NullIfEmpty(string? text) =>
