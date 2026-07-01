@@ -34,12 +34,86 @@ public sealed partial class ReviewPage : Page
     private async void ReviewPage_Loaded(object sender, RoutedEventArgs e)
     {
         await LoadLocationsAsync();
+        await RefreshPendingUploadBadgeAsync();
     }
 
     private async void ReviewPage_Unloaded(object sender, RoutedEventArgs e)
     {
         _dictation?.Dispose();
         _dictation = null;
+    }
+
+    private async Task RefreshPendingUploadBadgeAsync()
+    {
+        var publisher = App.CloudPublisher;
+        if (publisher == null || !App.SettingsStore!.Load().IsCloudConfigured)
+        {
+            SyncCloudButton.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        SyncCloudButton.Visibility = Visibility.Visible;
+        try
+        {
+            int pending = await publisher.GetPendingCountAsync();
+            if (pending > 0)
+            {
+                PendingUploadBadgeText.Text = pending > 99 ? "99+" : pending.ToString();
+                PendingUploadBadge.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                PendingUploadBadge.Visibility = Visibility.Collapsed;
+            }
+        }
+        catch
+        {
+            PendingUploadBadge.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private async void SyncCloudButton_Click(object sender, RoutedEventArgs e)
+    {
+        var publisher = App.CloudPublisher;
+        if (publisher == null) return;
+
+        SyncCloudButton.IsEnabled = false;
+        try
+        {
+            var progress = new Progress<(int completed, int total)>(p =>
+            {
+                ReviewStatusText.Text = p.total > 0
+                    ? $"Publishing to cloud… {p.completed}/{p.total}"
+                    : "Publishing to cloud…";
+            });
+
+            var outcome = await publisher.SyncAllReviewedAsync(progress);
+            if (outcome.Success)
+            {
+                if (outcome.Uploaded == 0 && outcome.Unpublished == 0)
+                {
+                    ReviewStatusText.Text = "Cloud is already up to date — nothing to publish.";
+                }
+                else
+                {
+                    ReviewStatusText.Text =
+                        $"Published to cloud — {outcome.Uploaded} uploaded, {outcome.Unpublished} removed.";
+                }
+            }
+            else
+            {
+                ReviewStatusText.Text = $"Cloud publish failed: {outcome.Error}";
+            }
+        }
+        catch (Exception ex)
+        {
+            ReviewStatusText.Text = $"Cloud publish failed: {ex.Message}";
+        }
+        finally
+        {
+            SyncCloudButton.IsEnabled = true;
+            await RefreshPendingUploadBadgeAsync();
+        }
     }
 
     private async Task LoadLocationsAsync()
@@ -346,6 +420,7 @@ public sealed partial class ReviewPage : Page
             // show how many are still pending. The save above is already done.
             App.BackgroundDescriptions?.Enqueue(result.SavedBooks);
             ReviewStatusText.Text = $"Queued {result.SavedBooks.Count} book(s) for descriptions — generating in the background.";
+            await RefreshPendingUploadBadgeAsync();
 
             // Remove this scan set if all candidates are processed
             if (_candidates.Count == 0 && _currentScanIndex >= 0 && _currentScanIndex < _scanQueue.Count)
