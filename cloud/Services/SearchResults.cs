@@ -24,4 +24,8 @@ public sealed class CopyResult
     public string? OwnerHousehold { get; init; }
     public string? ShelfLocation { get; init; }
     public string? SpineImageUrl { get; init; }
+    public string? BookshelfImageUrl { get; init; }
+
+    /// <summary>Normalized "x,y,w,h" box of this copy on the bookshelf photo.</summary>
+    public string? SpineBoxNorm { get; init; }
 }

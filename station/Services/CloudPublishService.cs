@@ -180,10 +180,14 @@ public sealed class CloudPublishService
         ShelfLocation = string.IsNullOrWhiteSpace(shelf) ? null : shelf,
         SpineImage = LoadSpineImage(book.SpineImagePath),
         CoverImage = LoadCoverImage(book.DescriptionSourcesJson),
+        BookshelfImage = LoadInlineImage(book.BookshelfImagePath),
+        SpineBoxNorm = string.IsNullOrWhiteSpace(book.SpineBoxNorm) ? null : book.SpineBoxNorm,
         DescriptionSourcesJson = book.DescriptionSourcesJson,
     };
 
-    private static ImagePayload? LoadSpineImage(string? path)
+    private static ImagePayload? LoadSpineImage(string? path) => LoadInlineImage(path);
+
+    private static ImagePayload? LoadInlineImage(string? path)
     {
         if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
         {
@@ -255,6 +259,8 @@ public sealed class CloudPublishService
             owner,
             shelf,
             book.SpineImagePath,
+            book.BookshelfImagePath,
+            book.SpineBoxNorm,
             ExtractCoverUrl(book.DescriptionSourcesJson));
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(material));
         return Convert.ToHexString(bytes);

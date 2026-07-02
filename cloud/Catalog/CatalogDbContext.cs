@@ -35,6 +35,7 @@ public sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> options)
             c.Property(x => x.StationBookId).HasMaxLength(128);
             c.Property(x => x.OwnerHousehold).HasMaxLength(256);
             c.Property(x => x.ShelfLocation).HasMaxLength(256);
+            c.Property(x => x.SpineBoxNorm).HasMaxLength(64);
             c.HasOne(x => x.Book)
                 .WithMany(x => x.Copies)
                 .HasForeignKey(x => x.BookId)

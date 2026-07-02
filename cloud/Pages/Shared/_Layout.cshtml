@@ -1,9 +1,10 @@
 ﻿<!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-bs-theme="dark">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] - BiblioText</title>
+    <link rel="icon" type="image/png" href="~/img/flower-bridge.png" />
     <script type="importmap"></script>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
@@ -11,9 +12,12 @@
 </head>
 <body>
     <header>
-        <nav class="navbar navbar-expand-sm navbar-dark biblio-nav mb-4">
+        <nav class="navbar navbar-expand-sm biblio-nav mb-4">
             <div class="container">
-                <a class="navbar-brand fw-bold" asp-area="" asp-page="/Index">📚 BiblioText</a>
+                <a class="navbar-brand d-flex align-items-center gap-2" asp-area="" asp-page="/Index">
+                    <img src="~/img/flower-bridge.png" alt="Flower Bridge" class="brand-logo" />
+                    <span class="brand-word">BiblioText</span>
+                </a>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
                         aria-expanded="false" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>

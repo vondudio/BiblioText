@@ -47,6 +47,22 @@ public sealed class BookPayload
     public ImagePayload? CoverImage { get; init; }
 
     /// <summary>
+    /// The full bookshelf scan photo this book was detected in (usually inline
+    /// base64). Paired with <see cref="SpineBoxNorm"/> so the website can show the
+    /// book highlighted in context on the shelf.
+    /// </summary>
+    [JsonPropertyName("bookshelfImage")]
+    public ImagePayload? BookshelfImage { get; init; }
+
+    /// <summary>
+    /// Detection bounding box on <see cref="BookshelfImage"/>, as normalized 0..1
+    /// coordinates "x,y,w,h" (invariant culture). Null when the box is unknown
+    /// (e.g. full-image AI analysis or a book saved before boxes were captured).
+    /// </summary>
+    [JsonPropertyName("spineBoxNorm")]
+    public string? SpineBoxNorm { get; init; }
+
+    /// <summary>
     /// Provenance of the description (Google/Wikipedia/Open Library/AI) as the
     /// station's serialized <c>description_sources_json</c>, passed through for
     /// the website's source badges. Opaque to the contract.

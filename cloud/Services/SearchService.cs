@@ -90,6 +90,8 @@ public sealed class SearchService(CatalogDbContext db, IEmbeddingService embeddi
                 OwnerHousehold = c.OwnerHousehold,
                 ShelfLocation = c.ShelfLocation,
                 SpineImageUrl = c.SpineImageUrl,
+                BookshelfImageUrl = c.BookshelfImageUrl,
+                SpineBoxNorm = c.SpineBoxNorm,
             })
             .ToList(),
     };

@@ -127,6 +127,7 @@ public sealed class PublishService(
 
         copy.OwnerHousehold = payload.OwnerHousehold;
         copy.ShelfLocation = payload.ShelfLocation;
+        copy.SpineBoxNorm = payload.SpineBoxNorm;
         copy.UpdatedAt = now;
 
         var spineUrl = await imageStorage.StoreAsync(
@@ -136,6 +137,15 @@ public sealed class PublishService(
         if (!string.IsNullOrWhiteSpace(spineUrl))
         {
             copy.SpineImageUrl = spineUrl;
+        }
+
+        var shelfUrl = await imageStorage.StoreAsync(
+            payload.BookshelfImage,
+            $"shelves/{stationId}/{payload.StationBookId}",
+            cancellationToken);
+        if (!string.IsNullOrWhiteSpace(shelfUrl))
+        {
+            copy.BookshelfImageUrl = shelfUrl;
         }
     }
 

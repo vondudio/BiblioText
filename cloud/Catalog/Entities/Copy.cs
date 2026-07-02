@@ -30,6 +30,16 @@ public sealed class Copy
     /// <summary>Hosted spine-crop image URL.</summary>
     public string? SpineImageUrl { get; set; }
 
+    /// <summary>Hosted full bookshelf scan photo this copy was detected in.</summary>
+    public string? BookshelfImageUrl { get; set; }
+
+    /// <summary>
+    /// Detection bounding box on <see cref="BookshelfImageUrl"/> as normalized
+    /// 0..1 "x,y,w,h" (invariant culture). Drives the highlight overlay on the
+    /// website. Null when unknown.
+    /// </summary>
+    public string? SpineBoxNorm { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
 }

@@ -7,6 +7,26 @@
     var spine = book.Copies.Select(c => c.SpineImageUrl).FirstOrDefault(s => !string.IsNullOrEmpty(s));
 }
 
+@functions {
+    static (double X, double Y, double W, double H)? ParseBox(string? s)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return null;
+        var p = s.Split(',');
+        if (p.Length != 4) return null;
+        var ci = System.Globalization.CultureInfo.InvariantCulture;
+        const System.Globalization.NumberStyles ns = System.Globalization.NumberStyles.Float;
+        if (double.TryParse(p[0], ns, ci, out var x) && double.TryParse(p[1], ns, ci, out var y)
+            && double.TryParse(p[2], ns, ci, out var w) && double.TryParse(p[3], ns, ci, out var h))
+        {
+            return (x, y, w, h);
+        }
+        return null;
+    }
+
+    static string Pct(double v) =>
+        (v * 100).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture) + "%";
+}
+
 <nav aria-label="breadcrumb" class="mb-3">
     <a asp-page="/Index" class="text-decoration-none">&larr; Back to catalog</a>
 </nav>
@@ -65,18 +85,46 @@
         <div class="list-group">
             @foreach (var copy in book.Copies)
             {
-                <div class="list-group-item d-flex align-items-center gap-3">
-                    @if (!string.IsNullOrEmpty(copy.SpineImageUrl))
-                    {
-                        <img src="@copy.SpineImageUrl" alt="Spine" class="copy-spine" />
-                    }
-                    <div>
-                        <div class="fw-semibold">@(string.IsNullOrEmpty(copy.OwnerHousehold) ? "Unknown shelf" : copy.OwnerHousehold)</div>
-                        @if (!string.IsNullOrEmpty(copy.ShelfLocation))
+                var box = ParseBox(copy.SpineBoxNorm);
+                var whose = string.IsNullOrEmpty(copy.OwnerHousehold) ? "Unknown shelf" : copy.OwnerHousehold;
+                <div class="list-group-item">
+                    <div class="d-flex align-items-center gap-3">
+                        @if (!string.IsNullOrEmpty(copy.SpineImageUrl))
                         {
-                            <div class="text-muted small">@copy.ShelfLocation</div>
+                            <img src="@copy.SpineImageUrl" alt="Spine" class="copy-spine" />
                         }
+                        <div>
+                            <div class="fw-semibold">@whose</div>
+                            @if (!string.IsNullOrEmpty(copy.ShelfLocation))
+                            {
+                                <div class="text-muted small">@copy.ShelfLocation</div>
+                            }
+                        </div>
                     </div>
+
+                    @if (!string.IsNullOrEmpty(copy.BookshelfImageUrl))
+                    {
+                        <figure class="mt-3 mb-0">
+                            <div class="shelf-figure">
+                                <img src="@copy.BookshelfImageUrl" alt="@book.Title highlighted on the shelf" loading="lazy" />
+                                @if (box is { } b)
+                                {
+                                    <span class="shelf-box"
+                                          style="left:@Pct(b.X);top:@Pct(b.Y);width:@Pct(b.W);height:@Pct(b.H);"></span>
+                                }
+                            </div>
+                            <figcaption class="shelf-caption">
+                                @if (box is not null)
+                                {
+                                    <span>Highlighted on the shelf@(string.IsNullOrEmpty(copy.ShelfLocation) ? "" : $" ({copy.ShelfLocation})").</span>
+                                }
+                                else
+                                {
+                                    <span>The shelf this copy lives on@(string.IsNullOrEmpty(copy.ShelfLocation) ? "" : $" ({copy.ShelfLocation})").</span>
+                                }
+                            </figcaption>
+                        </figure>
+                    }
                 </div>
             }
         </div>
